@@ -19,13 +19,14 @@ const App = () => {
   const MAPBOX_TOKEN =
     'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
 
-  // 🔹 Obtener ubicación del usuario
+  // 🔹 Obtener ubicación del usuario y buscar videos cercanos
   const getUserLocation = (recenter = false) => {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
+        async (pos) => {
           const { latitude, longitude } = pos.coords;
           setUserLocation({ latitude, longitude });
+
           if (recenter) {
             setViewport((prev) => ({
               ...prev,
@@ -33,6 +34,24 @@ const App = () => {
               longitude,
               zoom: 6,
             }));
+          }
+
+          // 🔹 Llamar al backend para buscar videos cercanos
+          try {
+            setMessage('Buscando videos en tu ubicación...');
+            const response = await fetch(
+              `http://localhost:3001/api/searchByCoords?lat=${latitude}&lng=${longitude}`
+            );
+            const data = await response.json();
+            if (Array.isArray(data)) {
+              setVideos(data);
+              setMessage('');
+            } else {
+              setMessage('No se encontraron videos en tu ubicación.');
+            }
+          } catch (err) {
+            console.error(err);
+            setMessage('Error buscando videos en tu ubicación.');
           }
         },
         (err) => {
@@ -46,7 +65,7 @@ const App = () => {
     }
   };
 
-  // 🔹 Buscar videos en el backend
+  // 🔹 Buscar videos en el backend por nombre de ubicación
   const fetchVideos = async (query) => {
     setMessage('Buscando videos...');
     try {
@@ -68,8 +87,23 @@ const App = () => {
   };
 
   useEffect(() => {
+    // Cargar videos iniciales de México
     fetchVideos('México');
-    getUserLocation(true);
+    
+    // Obtener ubicación del usuario pero no buscar videos automáticamente
+    // para evitar duplicar la búsqueda inicial
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          setUserLocation({ latitude, longitude });
+        },
+        (err) => {
+          console.error('Error obteniendo ubicación inicial:', err);
+        },
+        { enableHighAccuracy: true }
+      );
+    }
   }, []);
 
   const handleSearchSubmit = (e) => {
@@ -143,7 +177,7 @@ const App = () => {
             {/* Markers de videos */}
             {videos.map((video) => (
               <Marker
-                key={video.id}
+                key={video.youtube_video_id}
                 latitude={video.latitude}
                 longitude={video.longitude}
                 anchor="bottom"
@@ -190,7 +224,7 @@ const App = () => {
           <div className="grid grid-cols-1 gap-4">
             {videos.map((video) => (
               <div
-                key={video.id}
+                key={video.youtube_video_id}
                 onClick={() => handleMarkerClick(video)}
                 className="bg-gray-700 p-4 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors"
               >
