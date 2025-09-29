@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Map, { Marker, NavigationControl } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import YouTube from 'react-youtube';
+import AuthModal from './AuthModal';
 
 const MainApp = () => {
   const [viewport, setViewport] = useState({
@@ -15,95 +16,221 @@ const MainApp = () => {
   const [videos, setVideos] = useState([]);
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [message, setMessage] = useState('');
+  const [isUsingCurrentLocation, setIsUsingCurrentLocation] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [user, setUser] = useState(null);
   const navigate = useNavigate();
 
   const MAPBOX_TOKEN = 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
 
-  // Obtener ubicación del usuario y buscar videos cercanos
-  const getUserLocation = (recenter = false) => {
+  // Verificar autenticación al cargar
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
+    
+    if (token && savedUser) {
+      setUser(JSON.parse(savedUser));
+    }
+  }, []);
+
+  // Función para obtener ubicación con nombre real
+  const getLocationName = async (lat, lng) => {
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}&types=region,place,locality&language=es&country=mx`
+      );
+      const data = await response.json();
+      
+      if (data.features && data.features.length > 0) {
+        for (let feature of data.features) {
+          if (feature.place_type.includes('place') || feature.place_type.includes('region')) {
+            return feature.place_name;
+          }
+        }
+        return data.features[0].place_name;
+      }
+      return `Ubicación actual (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+    } catch (error) {
+      return `Mi ubicación actual`;
+    }
+  };
+
+  // Obtener ubicación del usuario
+  const getUserLocation = async (recenter = false) => {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
           const { latitude, longitude } = pos.coords;
           setUserLocation({ latitude, longitude });
+          setIsUsingCurrentLocation(true);
+
+          const locationName = await getLocationName(latitude, longitude);
 
           if (recenter) {
-            setViewport((prev) => ({
-              ...prev,
+            setViewport({
               latitude,
               longitude,
-              zoom: 6,
-            }));
+              zoom: 12,
+            });
           }
 
-          // Llamar al backend para buscar videos cercanos
           try {
-            setMessage('Buscando videos en tu ubicación...');
             const response = await fetch(
               `http://localhost:3001/api/searchByCoords?lat=${latitude}&lng=${longitude}`
             );
             const data = await response.json();
             if (Array.isArray(data)) {
-              setVideos(data);
-              setMessage('');
-            } else {
-              setMessage('No se encontraron videos en tu ubicación.');
+              const updatedVideos = data.map(video => ({
+                ...video,
+                location_name: locationName,
+                isCurrentLocation: true
+              }));
+              setVideos(updatedVideos);
             }
           } catch (err) {
-            console.error(err);
-            setMessage('Error buscando videos en tu ubicación.');
+            console.error('Error buscando videos:', err);
           }
         },
         (err) => {
           console.error('Error obteniendo ubicación:', err);
-          setMessage('No se pudo obtener tu ubicación.');
+          setIsUsingCurrentLocation(false);
         },
         { enableHighAccuracy: true }
       );
-    } else {
-      setMessage('La geolocalización no está soportada en este navegador.');
     }
   };
 
-  // Buscar videos en el backend por nombre de ubicación
+  // Buscar videos por ubicación
   const fetchVideos = async (query) => {
-    setMessage('Buscando videos...');
     try {
       const response = await fetch(
         `http://localhost:3001/api/search?q=${encodeURIComponent(query)}`
       );
-      if (!response.ok) throw new Error('No se pudo conectar al servidor.');
+      if (!response.ok) throw new Error('Error de conexión');
       const data = await response.json();
-      if (data.length === 0) {
-        setMessage('No se encontraron videos.');
-      } else {
-        setMessage('');
-      }
       setVideos(data);
-      setSelectedVideo(null); // Limpiar video seleccionado al buscar nuevos
+      setIsUsingCurrentLocation(false);
     } catch (error) {
-      console.error('Error fetching videos:', error);
-      setMessage('Error al buscar videos. Intenta más tarde.');
+      console.error('Error al buscar videos:', error);
     }
   };
 
+  // Buscar videos populares basados en la ubicación actual
+  const fetchPopularVideos = async () => {
+    if (!userLocation) {
+      alert('Primero activa tu ubicación usando el botón "Mi Ubicación"');
+      return;
+    }
+
+    try {
+      // Simular búsqueda de videos populares cerca de la ubicación actual
+      const simulatedPopularVideos = [
+        {
+          youtube_video_id: 'dQw4w9WgXcQ',
+          location_name: await getLocationName(userLocation.latitude, userLocation.longitude),
+          latitude: userLocation.latitude + (Math.random() - 0.5) * 0.1,
+          longitude: userLocation.longitude + (Math.random() - 0.5) * 0.1,
+          views: 15000,
+          isPopular: true
+        },
+        {
+          youtube_video_id: '9bZkp7q19f0',
+          location_name: await getLocationName(userLocation.latitude, userLocation.longitude),
+          latitude: userLocation.latitude + (Math.random() - 0.5) * 0.1,
+          longitude: userLocation.longitude + (Math.random() - 0.5) * 0.1,
+          views: 12000,
+          isPopular: true
+        },
+        {
+          youtube_video_id: 'kJQP7kiw5Fk',
+          location_name: await getLocationName(userLocation.latitude, userLocation.longitude),
+          latitude: userLocation.latitude + (Math.random() - 0.5) * 0.1,
+          longitude: userLocation.longitude + (Math.random() - 0.5) * 0.1,
+          views: 9800,
+          isPopular: true
+        }
+      ];
+      
+      setVideos(simulatedPopularVideos);
+    } catch (error) {
+      console.error('Error cargando videos populares:', error);
+    }
+  };
+
+  // Buscar otros videos relacionados
+  const fetchOtherVideos = async () => {
+    if (!userLocation) {
+      alert('Primero activa tu ubicación usando el botón "Mi Ubicación"');
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `http://localhost:3001/api/searchByCoords?lat=${userLocation.latitude}&lng=${userLocation.longitude}`
+      );
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        const locationName = await getLocationName(userLocation.latitude, userLocation.longitude);
+        const otherVideos = data.slice(0, 4).map(video => ({
+          ...video,
+          location_name: `${locationName} - Relacionado`,
+          isOther: true
+        }));
+        setVideos(otherVideos);
+      }
+    } catch (error) {
+      console.error('Error buscando otros videos:', error);
+    }
+  };
+
+  // Handlers de autenticación
+  const handleLogin = (userData) => {
+    setUser(userData);
+    setShowProfile(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
+    setShowProfile(false);
+  };
+
+  // Handlers de videos
+  const handleVideoClick = (video) => {
+    setSelectedVideo(video);
+  };
+
+  const handleVideoDoubleClick = (video) => {
+    navigateToVideo(video);
+  };
+
+  const handleMarkerClick = (video) => {
+    setSelectedVideo(video);
+  };
+
+  const handleMarkerDoubleClick = (video) => {
+    navigateToVideo(video);
+  };
+
+  // Función para navegar al video
+  const navigateToVideo = (video) => {
+    if (video && video.youtube_video_id) {
+      navigate(`/video/${video.youtube_video_id}`);
+    }
+  };
+
+  // Handler para el botón "Ver Completo"
+  const handleWatchComplete = () => {
+    if (selectedVideo && selectedVideo.youtube_video_id) {
+      navigate(`/video/${selectedVideo.youtube_video_id}`);
+    }
+  };
+
+  // Cargar videos de México al inicio
   useEffect(() => {
     fetchVideos('México');
-    
-    // Obtener ubicación del usuario sin buscar videos automáticamente
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords;
-          setUserLocation({ latitude, longitude });
-        },
-        (err) => {
-          console.error('Error obteniendo ubicación inicial:', err);
-        },
-        { enableHighAccuracy: true }
-      );
-    }
   }, []);
 
   const handleSearchSubmit = (e) => {
@@ -113,50 +240,84 @@ const MainApp = () => {
     }
   };
 
-  // Click simple: Mostrar vista previa
-  const handleVideoClick = (video) => {
-    setSelectedVideo(video);
-  };
-
-  // Doble click: Navegar a página completa
-  const handleVideoDoubleClick = (video) => {
-    navigate(`/video/${video.youtube_video_id}`);
-  };
-
-  // Click en marker: Mostrar vista previa
-  const handleMarkerClick = (video) => {
-    setSelectedVideo(video);
-  };
-
-  // Doble click en marker: Navegar a página completa
-  const handleMarkerDoubleClick = (video) => {
-    navigate(`/video/${video.youtube_video_id}`);
-  };
-
   return (
-    <div className="flex h-screen w-screen bg-gray-900 text-white overflow-hidden">
+    <div className="flex h-screen w-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 text-white overflow-hidden">
       {/* Barra superior */}
-      <div className="absolute top-0 left-0 w-full h-16 bg-blue-700 flex items-center justify-between px-4 z-10">
-        <h1 className="text-2xl font-bold">GeoTube 🌐</h1>
-        <form onSubmit={handleSearchSubmit} className="flex items-center">
-          <input
-            type="text"
-            placeholder="Buscar lugares, videos..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="py-2 px-4 rounded-full text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            type="submit"
-            className="ml-2 bg-blue-500 text-white rounded-full p-2 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            🔍
-          </button>
-        </form>
+      <div className="navbar absolute top-0 left-0 w-full h-20 flex items-center justify-between px-8 z-50">
+        <div className="flex items-center gap-8">
+          <h1 className="text-3xl font-bold text-gradient bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
+            🌐 GeoTube Pro
+          </h1>
+          <form onSubmit={handleSearchSubmit} className="flex items-center">
+            <input
+              type="text"
+              placeholder=" Buscar ciudades, lugares..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="search-input glass-effect"
+            />
+            <button type="submit" className="ml-4 btn-primary">
+              Buscar
+            </button>
+          </form>
+        </div>
+
+        <div className="flex items-center gap-6">
+          {user ? (
+            <>
+              <div className="relative">
+                <button 
+                  onClick={() => setShowProfile(!showProfile)}
+                  className="user-avatar text-lg"
+                  title={user.nombre}
+                >
+                  {user.nombre.charAt(0).toUpperCase()}
+                </button>
+                
+                {showProfile && (
+                  <div className="absolute right-0 top-16 w-64 glass-effect rounded-2xl shadow-2xl z-50">
+                    <div className="p-6 border-b border-white/10">
+                      <p className="font-bold text-cyan-400">{user.nombre}</p>
+                      <p className="text-sm text-gray-300">{user.email}</p>
+                    </div>
+                    <div className="p-4">
+                      <button className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 transition">
+                         Mi Perfil
+                      </button>
+                      <button className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 transition">
+                         Estadísticas
+                      </button>
+                      <button 
+                        onClick={handleLogout}
+                        className="w-full text-left px-4 py-3 rounded-xl hover:bg-red-500/20 text-red-400 transition"
+                      >
+                         Cerrar Sesión
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <button 
+              onClick={() => setShowAuthModal(true)}
+              className="btn-primary flex items-center gap-2"
+            >
+              Iniciar Sesión
+            </button>
+          )}
+        </div>
       </div>
 
+      {/* Modal de autenticación */}
+      <AuthModal 
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onLogin={handleLogin}
+      />
+
       {/* Contenido principal */}
-      <div className="flex-1 flex pt-16">
+      <div className="flex-1 flex pt-20">
         {/* Mapa */}
         <div className="flex-1 relative">
           <Map
@@ -165,75 +326,83 @@ const MainApp = () => {
             onMove={(evt) => setViewport(evt.viewState)}
             mapboxAccessToken={MAPBOX_TOKEN}
             mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
-            projection={{ name: 'globe' }}
-            terrain={{ source: 'mapbox-dem', exaggeration: 1.5 }}
-            fog={{
-              range: [0.5, 10],
-              color: '#242B4B',
-              'horizon-blend': 0.2,
-              'high-color': '#88ccee',
-              'space-color': '#000000',
-              'star-intensity': 0.6,
-            }}
           >
             <NavigationControl position="top-right" />
 
-            {/* Marker ubicación del usuario */}
             {userLocation && (
-              <Marker
-                latitude={userLocation.latitude}
-                longitude={userLocation.longitude}
-                anchor="center"
-              >
-                <div className="h-4 w-4 bg-blue-500 border-2 border-white rounded-full shadow-lg animate-ping"></div>
+              <Marker latitude={userLocation.latitude} longitude={userLocation.longitude}>
+                <div className="relative">
+                  <div className="h-8 w-8 bg-gradient-to-r from-red-500 to-pink-500 border-3 border-white rounded-full animate-ping absolute"></div>
+                  <div className="absolute -bottom-10 -left-6 glass-effect text-xs px-3 py-1 rounded-full font-bold">
+                  </div>
+                </div>
               </Marker>
             )}
 
-            {/* Markers de videos */}
             {videos.map((video) => (
-              <Marker
-                key={video.youtube_video_id}
-                latitude={video.latitude}
-                longitude={video.longitude}
-                anchor="bottom"
-              >
+              <Marker key={video.youtube_video_id} latitude={video.latitude} longitude={video.longitude}>
                 <div
                   onClick={() => handleMarkerClick(video)}
                   onDoubleClick={() => handleMarkerDoubleClick(video)}
-                  className="cursor-pointer text-2xl transform hover:scale-125 transition-transform duration-200"
+                  className="cursor-pointer text-3xl transform hover:scale-150 transition-all duration-300"
                   title="Click para vista previa, Doble click para ver completo"
                 >
-                  📍
+                  {video.isPopular ? '' : video.isOther ? '' : '📍'}
                 </div>
               </Marker>
             ))}
           </Map>
 
-          {/* Botón flotante de mi ubicación */}
           <button
             onClick={() => getUserLocation(true)}
-            className="absolute bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg hover:bg-blue-700 transition"
+            className="absolute bottom-6 right-6 btn-success text-lg font-bold px-6 py-3 rounded-2xl shadow-2xl"
           >
-            📍 Mi ubicación
+            🌍 Mi Ubicación
           </button>
-
-          {message && (
-            <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-800 bg-opacity-75 p-4 rounded-lg">
-              <p className="text-white text-center">{message}</p>
-            </div>
-          )}
         </div>
 
-        {/* Sidebar derecha */}
-        <div className="w-1/3 bg-gray-800 overflow-y-auto p-4 flex flex-col">
-          <h2 className="text-xl font-bold mb-4">Videos Destacados</h2>
-          
-          {/* Vista previa del video seleccionado */}
+        {/* Sidebar */}
+        <div className="w-1/3 bg-gradient-to-b from-slate-900 via-purple-900 to-blue-900 overflow-y-auto p-6 flex flex-col">
+          {/* Header del sidebar */}
+          <div className="text-center mb-6">
+            <h2 className="text-3xl font-bold bg-gradient-to-r from-yellow-400 via-red-400 to-pink-400 bg-clip-text text-transparent">
+               Videos Destacados
+            </h2>
+            <p className="text-cyan-300 text-sm mt-2">
+              {isUsingCurrentLocation ? '📍 Basado en tu ubicación actual' : '🌎 Explorando México'}
+            </p>
+          </div>
+
+          {/* Botones de acción */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <button
+              onClick={fetchOtherVideos}
+              disabled={!userLocation}
+              className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-bold py-3 px-4 rounded-2xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+            >
+              <span className="text-lg">🔄</span>
+              <br />
+              Otros Videos
+            </button>
+            <button
+              onClick={fetchPopularVideos}
+              disabled={!userLocation}
+              className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold py-3 px-4 rounded-2xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+            >
+              <span className="text-lg">🔥</span>
+              <br />
+              Populares
+            </button>
+          </div>
+
+          {/* Vista previa */}
           {selectedVideo && (
-            <div className="mb-6 bg-gray-700 rounded-lg p-4">
-              <h3 className="text-lg font-bold mb-3 text-center">
-                🎬 Vista Previa: {selectedVideo.location_name}
-              </h3>
+            <div className="glass-effect rounded-2xl p-4 mb-6 border-2 border-cyan-500/50">
+              <div className="text-center mb-3">
+                <h3 className="text-lg font-bold text-cyan-300">
+                   Vista Previa: {selectedVideo.location_name}
+                </h3>
+              </div>
               <div className="bg-black rounded-lg overflow-hidden mb-3">
                 <YouTube
                   videoId={selectedVideo.youtube_video_id}
@@ -248,65 +417,62 @@ const MainApp = () => {
                   }}
                 />
               </div>
-              <div className="flex gap-2">
-                <button
+              <div className="grid grid-cols-2 gap-3">
+                <button 
                   onClick={() => setSelectedVideo(null)}
-                  className="flex-1 bg-gray-600 py-2 rounded hover:bg-gray-500 transition"
+                  className="bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300"
                 >
-                  Cerrar Vista Previa
+                  ✕ Cerrar
                 </button>
-                <button
-                  onClick={() => navigate(`/video/${selectedVideo.youtube_video_id}`)}
-                  className="flex-1 bg-red-600 py-2 rounded hover:bg-red-500 transition font-semibold"
+                <button 
+                  onClick={handleWatchComplete}
+                  className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300 transform hover:scale-105"
                 >
-                  Ver Completo 🚀
+                   Ver Completo
                 </button>
               </div>
             </div>
           )}
 
           {/* Lista de videos */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="grid grid-cols-1 gap-3">
-              {videos.map((video) => (
+          <div className="space-y-4 flex-1 overflow-y-auto">
+            {videos.length > 0 ? (
+              videos.map((video) => (
                 <div
                   key={video.youtube_video_id}
                   onClick={() => handleVideoClick(video)}
                   onDoubleClick={() => handleVideoDoubleClick(video)}
-                  className={`bg-gray-700 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors ${
-                    selectedVideo && selectedVideo.youtube_video_id === video.youtube_video_id 
-                    ? 'border-2 border-blue-500' 
-                    : ''
-                  }`}
+                  className={`glass-effect rounded-2xl p-4 cursor-pointer transform hover:scale-102 transition-all duration-300 border-l-4 ${
+                    video.isPopular ? 'border-l-orange-500 bg-orange-500/10' :
+                    video.isOther ? 'border-l-cyan-500 bg-cyan-500/10' :
+                    'border-l-green-500 bg-green-500/10'
+                  } ${selectedVideo?.youtube_video_id === video.youtube_video_id ? 'ring-2 ring-yellow-400' : ''}`}
                   title="Click para vista previa, Doble click para ver completo"
                 >
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={`https://img.youtube.com/vi/${video.youtube_video_id}/default.jpg`}
-                      alt="Thumbnail"
-                      className="w-16 h-12 rounded object-cover"
-                    />
-                    <div className="flex-1">
-                      <p className="font-semibold text-sm line-clamp-2">{video.location_name}</p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        ID: {video.youtube_video_id}
-                      </p>
+                  <div className="flex items-center gap-4">
+                    <div className={`text-2xl ${
+                      video.isPopular ? 'text-orange-400' :
+                      video.isOther ? 'text-cyan-400' :
+                      'text-green-400'
+                    }`}>
+                      {video.isPopular ? '' : video.isOther ? '' : '📍'}
                     </div>
-                    <div className="text-xs text-gray-400">
-                      📍
+                    <div className="flex-1">
+                      <p className="font-bold text-white">{video.location_name}</p>
+                      <p className="text-xs text-gray-300">ID: {video.youtube_video_id}</p>
+                      {video.views && (
+                        <p className="text-xs text-yellow-300">👁️ {video.views.toLocaleString()} views</p>
+                      )}
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Instrucciones */}
-          <div className="mt-4 p-3 bg-gray-700 rounded-lg text-xs text-gray-300">
-            <p>💡 <strong>Instrucciones:</strong></p>
-            <p>• <strong>Click simple</strong> en un video: Vista previa</p>
-            <p>• <strong>Doble click</strong> en un video: Ver completo</p>
-            <p>• Mismo comportamiento en los marcadores del mapa 📍</p>
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-400 text-lg">No se encontraron videos</p>
+                <p className="text-gray-500 text-sm">Usa la búsqueda o activa tu ubicación</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -2,6 +2,8 @@ const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
 const axios = require('axios');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const port = 3001;
@@ -9,8 +11,8 @@ const port = 3001;
 // Configuración de la conexión a MySQL
 const db = mysql.createConnection({
   host: 'localhost',
-  user: 'root', // Reemplaza con tu usuario
-  password: '12345', // Reemplaza con tu contraseña
+  user: 'root',
+  password: '12345',
   database: 'geotube_db',
 });
 
@@ -27,9 +29,176 @@ db.connect((err) => {
 app.use(cors());
 app.use(express.json());
 
-// API Keys - Reemplaza con tus claves reales
+// API Keys
 const YOUTUBE_API_KEY = 'AIzaSyAMXqOfXkEHPmpu0O5a83k7c_snASAEJ50';
 const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
+
+const JWT_SECRET = 'tu_clave_secreta_super_segura_geotube_2024';
+
+// Middleware para verificar token
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Token de acceso requerido' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Token inválido' });
+    }
+    req.user = user;
+    next();
+  });
+};
+
+// ==================== RUTAS DE AUTENTICACIÓN ====================
+
+// Registro de usuario
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { nombre, email, password } = req.body;
+
+    if (!nombre || !email || !password) {
+      return res.status(400).json({ error: 'Todos los campos son requeridos' });
+    }
+
+    // Verificar si el usuario ya existe
+    const [existingUsers] = await db.promise().execute(
+      'SELECT id FROM usuarios WHERE email = ?',
+      [email]
+    );
+
+    if (existingUsers.length > 0) {
+      return res.status(400).json({ error: 'El usuario ya existe' });
+    }
+
+    // Hash de la contraseña
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Insertar nuevo usuario
+    const [result] = await db.promise().execute(
+      'INSERT INTO usuarios (nombre, email, password) VALUES (?, ?, ?)',
+      [nombre, email, hashedPassword]
+    );
+
+    // Generar token
+    const token = jwt.sign(
+      { id: result.insertId, email: email },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.status(201).json({
+      message: 'Usuario registrado exitosamente',
+      token,
+      user: {
+        id: result.insertId,
+        nombre,
+        email
+      }
+    });
+
+  } catch (error) {
+    console.error('Error en registro:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Login de usuario
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email y contraseña son requeridos' });
+    }
+
+    // Buscar usuario
+    const [users] = await db.promise().execute(
+      'SELECT * FROM usuarios WHERE email = ?',
+      [email]
+    );
+
+    if (users.length === 0) {
+      return res.status(400).json({ error: 'Credenciales inválidas' });
+    }
+
+    const user = users[0];
+
+    // Verificar contraseña
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
+      return res.status(400).json({ error: 'Credenciales inválidas' });
+    }
+
+    // Generar token
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.json({
+      message: 'Login exitoso',
+      token,
+      user: {
+        id: user.id,
+        nombre: user.nombre,
+        email: user.email
+      }
+    });
+
+  } catch (error) {
+    console.error('Error en login:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Verificar token
+app.get('/api/auth/verify', authenticateToken, (req, res) => {
+  res.json({ 
+    valid: true, 
+    user: req.user 
+  });
+});
+
+// Obtener perfil de usuario
+app.get('/api/auth/profile', authenticateToken, async (req, res) => {
+  try {
+    const [users] = await db.promise().execute(
+      'SELECT id, nombre, email, creado_en FROM usuarios WHERE id = ?',
+      [req.user.id]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    // Obtener estadísticas del usuario
+    const [stats] = await db.promise().execute(
+      `SELECT COUNT(*) as total_videos, 
+              COUNT(DISTINCT video_id) as videos_unicos,
+              MAX(fecha) as ultimo_acceso
+       FROM accesos 
+       WHERE usuario_id = ?`,
+      [req.user.id]
+    );
+
+    res.json({
+      user: users[0],
+      statistics: stats[0]
+    });
+
+  } catch (error) {
+    console.error('Error obteniendo perfil:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// ==================== RUTAS PRINCIPALES ====================
 
 // Función para buscar videos en YouTube por ubicación
 const searchYouTubeVideos = async (lat, lng, query) => {
@@ -40,7 +209,7 @@ const searchYouTubeVideos = async (lat, lng, query) => {
         q: query,
         type: 'video',
         location: `${lat},${lng}`,
-        locationRadius: '50km', // Radio de búsqueda alrededor de la ubicación
+        locationRadius: '50km',
         key: YOUTUBE_API_KEY,
       },
     });
@@ -57,11 +226,10 @@ const geocodeLocation = async (query) => {
     const response = await axios.get(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json`, {
       params: {
         access_token: MAPBOX_ACCESS_TOKEN,
-        country: 'mx', // Limita la búsqueda a México
+        country: 'mx',
         language: 'es',
       },
     });
-    // Validar si la ubicación está dentro de México (Mapbox ya lo hace con 'country: mx')
     if (response.data.features.length > 0) {
       const feature = response.data.features[0];
       const [longitude, latitude] = feature.center;
@@ -78,26 +246,23 @@ const geocodeLocation = async (query) => {
   }
 };
 
-// Endpoint de la API para buscar y guardar videos
+// Endpoint para buscar y guardar videos por nombre de ubicación
 app.get('/api/search', async (req, res) => {
   const { q } = req.query;
   if (!q) {
     return res.status(400).json({ error: 'Falta el término de búsqueda.' });
   }
 
-  // 1. Geolocalizar la ubicación
   const location = await geocodeLocation(q);
   if (!location) {
     return res.status(404).json({ error: 'No se pudo encontrar la ubicación en México.' });
   }
 
-  // 2. Buscar videos de YouTube en la ubicación
   const youtubeVideos = await searchYouTubeVideos(location.latitude, location.longitude, q);
   if (!youtubeVideos || youtubeVideos.length === 0) {
     return res.status(404).json({ error: 'No se encontraron videos de YouTube para esta ubicación.' });
   }
 
-  // 3. Guardar videos en la base de datos y devolverlos
   const videoIds = youtubeVideos.map(item => item.id.videoId);
   const insertPromises = videoIds.map(videoId => {
     return new Promise((resolve, reject) => {
@@ -127,7 +292,136 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
+// Endpoint: buscar videos cerca de coordenadas
+app.get('/api/searchByCoords', async (req, res) => {
+  const { lat, lng } = req.query;
+  if (!lat || !lng) {
+    return res.status(400).json({ error: 'Faltan coordenadas (lat, lng).' });
+  }
+
+  const youtubeVideos = await searchYouTubeVideos(lat, lng, 'México');
+  if (!youtubeVideos || youtubeVideos.length === 0) {
+    return res.status(404).json({ error: 'No se encontraron videos en esta ubicación.' });
+  }
+
+  const videoIds = youtubeVideos.map(item => item.id.videoId);
+  const insertPromises = videoIds.map(videoId => {
+    return new Promise((resolve, reject) => {
+      const sql = "INSERT INTO videos (location_name, latitude, longitude, youtube_video_id) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE location_name = VALUES(location_name)";
+      db.query(sql, [`Ubicación actual`, lat, lng, videoId], (err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      });
+    });
+  });
+
+  try {
+    await Promise.all(insertPromises);
+    const savedVideos = videoIds.map(videoId => ({
+      location_name: "Ubicación actual",
+      latitude: parseFloat(lat),
+      longitude: parseFloat(lng),
+      youtube_video_id: videoId,
+    }));
+    res.json(savedVideos);
+  } catch (error) {
+    res.status(500).json({ error: 'Error guardando videos en la base de datos.' });
+  }
+});
+
+// Endpoint para obtener información detallada del video
+app.get('/api/video/:videoId', async (req, res) => {
+  try {
+    const { videoId } = req.params;
+
+    // Registrar acceso (sin información de usuario por ahora)
+    const ip_origen = req.ip || req.connection.remoteAddress;
+    const user_agent = req.get('User-Agent');
+    
+    try {
+      await db.promise().execute(
+        'CALL registrar_acceso(?, ?, NULL, NULL, ?, ?, ?)',
+        [null, videoId, 1, ip_origen, user_agent]
+      );
+    } catch (error) {
+      console.error('Error registrando acceso:', error);
+    }
+
+    // Obtener información del video
+    const [videoRows] = await db.promise().execute(
+      `SELECT v.*, 
+              COUNT(a.id) as total_views,
+              COUNT(DISTINCT a.ip_origen) as unique_viewers
+       FROM videos v 
+       LEFT JOIN accesos a ON v.id = a.video_id 
+       WHERE v.youtube_video_id = ? 
+       GROUP BY v.id`,
+      [videoId]
+    );
+
+    if (videoRows.length === 0) {
+      return res.status(404).json({ error: 'Video no encontrado' });
+    }
+
+    const video = videoRows[0];
+
+    // Obtener videos relacionados (misma ubicación)
+    const [relatedRows] = await db.promise().execute(
+      `SELECT v.*, 
+              COUNT(a.id) as view_count
+       FROM videos v 
+       LEFT JOIN accesos a ON v.id = a.video_id 
+       WHERE v.location_name = ? AND v.youtube_video_id != ?
+       GROUP BY v.id 
+       ORDER BY view_count DESC 
+       LIMIT 10`,
+      [video.location_name, videoId]
+    );
+
+    // Obtener estadísticas de accesos
+    const [statsRows] = await db.promise().execute(
+      `SELECT 
+         COUNT(*) as total_plays,
+         SUM(es_valido) as valid_plays,
+         DATE(fecha) as play_date
+       FROM accesos 
+       WHERE video_id = ? AND fecha >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+       GROUP BY DATE(fecha)
+       ORDER BY play_date DESC`,
+      [video.id]
+    );
+
+    res.json({
+      video: {
+        id: video.youtube_video_id,
+        title: video.location_name,
+        location: video.location_name,
+        coordinates: {
+          lat: video.latitude,
+          lng: video.longitude
+        },
+        uploadDate: video.creado_en,
+        views: video.total_views || 0,
+        uniqueViewers: video.unique_viewers || 0
+      },
+      relatedVideos: relatedRows,
+      statistics: statsRows
+    });
+
+  } catch (error) {
+    console.error('Error obteniendo video:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Ruta de prueba
+app.get('/api', (req, res) => {
+  res.json({ message: 'API de GeoTube funcionando correctamente' });
+});
+
 // Iniciar el servidor
 app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
+  console.log(` Servidor corriendo en http://localhost:${port}`);
+  console.log(` API disponible en http://localhost:${port}/api`);
+  console.log(` Rutas de autenticación en http://localhost:${port}/api/auth`);
 });

@@ -4,11 +4,162 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: #0f172a;
+}
+
+/* Gradientes y efectos profesionales */
+.gradient-bg {
+  background: linear-gradient(135deg, #1e40af 0%, #3730a3 50%, #5b21b6 100%);
+}
+
+.glass-effect {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.sidebar-gradient {
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+}
+
+/* Botones profesionales */
+.btn-primary {
+  @apply bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-2 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg;
+}
+
+.btn-secondary {
+  @apply bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 border border-gray-600;
+}
+
+.btn-success {
+  @apply bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300;
+}
+
+.btn-danger {
+  @apply bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300;
+}
+
+/* Tarjetas y elementos */
+.card {
+  @apply bg-gray-800 rounded-xl border border-gray-700 shadow-xl hover:shadow-2xl transition-all duration-300;
+}
+
+.card-hover {
+  @apply transform hover:-translate-y-1 transition-transform duration-300;
+}
+
+/* Barra de búsqueda profesional */
+.search-input {
+  @apply w-80 bg-gray-800 border border-gray-600 rounded-full px-6 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300;
+}
+
+/* Navegación y header */
+.navbar {
+  @apply bg-gray-900 border-b border-gray-700 shadow-lg;
+}
+
+.user-avatar {
+  @apply w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-semibold cursor-pointer hover:from-purple-600 hover:to-pink-600 transition-all duration-300;
+}
+
+/* Indicadores */
+.badge {
+  @apply px-2 py-1 rounded-full text-xs font-semibold;
+}
+
+.badge-success {
+  @apply bg-green-500 text-white;
+}
+
+.badge-primary {
+  @apply bg-blue-500 text-white;
+}
+
+.badge-warning {
+  @apply bg-yellow-500 text-black;
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+.slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Scrollbar personalizado */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1e293b;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Efectos de hover para videos */
+.video-item {
+  @apply transition-all duration-300 transform hover:scale-105;
+}
+
+.video-item:hover {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+/* Marcadores del mapa mejorados */
+.map-marker {
+  @apply filter drop-shadow-lg;
+}
+
+.map-marker:hover {
+  @apply scale-125;
+}
+
+/* Modal y overlays */
+.modal-overlay {
+  @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50;
+}
+
+.modal-content {
+  @apply bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4;
+}
+
+/* Utilidades */
+.text-gradient {
+  background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.border-gradient {
+  border: 2px solid;
+  border-image: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%) 1;
 }
 
 .line-clamp-2 {
@@ -18,38 +169,95 @@ body {
   overflow: hidden;
 }
 
-/* Estilos para mejorar la experiencia de doble click */
-.cursor-pointer {
-  cursor: pointer;
-  user-select: none;
-}
-
-/* Animación suave para los markers */
-.marker-animation {
-  transition: all 0.2s ease-in-out;
-}
-
-.marker-animation:hover {
-  transform: scale(1.2);
-}
-
-/* Estilos para el reproductor de YouTube en vista previa */
-.youtube-preview {
-  border-radius: 8px;
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-/* Efecto de selección en videos */
-.video-item {
-  transition: all 0.2s ease-in-out;
+/* Responsive */
+@media (max-width: 768px) {
+  .search-input {
+    @apply w-64;
+  }
 }
 
-.video-item:hover {
+/* Gradientes ultra llamativos */
+.sidebar-gradient {
+  background: linear-gradient(135deg, 
+    #1a1a2e 0%, 
+    #16213e 25%, 
+    #0f3460 50%, 
+    #533483 75%, 
+    #e94560 100%);
+}
+
+.glass-effect {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* Efectos de texto neon */
+.text-gradient {
+  background: linear-gradient(45deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3);
+  background-size: 400% 400%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradientShift 3s ease infinite;
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Botones con efectos de luz */
+.btn-glow {
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.btn-glow:hover {
+  box-shadow: 0 0 30px rgba(255, 255, 255, 0.4);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-.video-item.selected {
-  border-color: #3b82f6;
-  background-color: #4b5563;
+/* Animaciones para tarjetas de video */
+.video-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.video-card:hover {
+  transform: translateY(-5px) scale(1.02);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+/* Colores específicos para modos */
+.mode-popular {
+  background: linear-gradient(135deg, #ff6b35, #f7931e);
+}
+
+.mode-other {
+  background: linear-gradient(135deg, #00b4db, #0083b0);
+}
+
+.mode-featured {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+}
+
+/* Efectos de partículas para fondo */
+.bg-animated {
+  background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+  background-size: 400% 400%;
+  animation: gradient 15s ease infinite;
+}
+
+@keyframes gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
