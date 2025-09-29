@@ -261,3 +261,21 @@ body {
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
+
+/* Toggle switch */
+.toggle {
+  @apply relative inline-flex h-6 w-11 items-center rounded-full bg-gray-600;
+}
+
+.toggle:checked {
+  @apply bg-blue-600;
+}
+
+.toggle:checked:before {
+  transform: translateX(1.25rem);
+}
+
+.toggle:before {
+  @apply absolute left-1 h-4 w-4 rounded-full bg-white transition-transform;
+  content: '';
+}
