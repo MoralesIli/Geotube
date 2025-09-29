@@ -4,6 +4,8 @@ import Map, { Marker, NavigationControl } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import YouTube from 'react-youtube';
 import AuthModal from './AuthModal';
+import ChangePasswordModal from './ChangePasswordModal';
+import ChangePhotoModal from './ChangePhotoModal';
 
 const MainApp = () => {
   const [viewport, setViewport] = useState({
@@ -19,6 +21,9 @@ const MainApp = () => {
   const [isUsingCurrentLocation, setIsUsingCurrentLocation] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
 
@@ -124,7 +129,6 @@ const MainApp = () => {
     }
 
     try {
-      // Simular búsqueda de videos populares cerca de la ubicación actual
       const simulatedPopularVideos = [
         {
           youtube_video_id: 'dQw4w9WgXcQ',
@@ -246,12 +250,12 @@ const MainApp = () => {
       <div className="navbar absolute top-0 left-0 w-full h-20 flex items-center justify-between px-8 z-50">
         <div className="flex items-center gap-8">
           <h1 className="text-3xl font-bold text-gradient bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
-            🌐 GeoTube Pro
+            GeoTube Pro
           </h1>
           <form onSubmit={handleSearchSubmit} className="flex items-center">
             <input
               type="text"
-              placeholder=" Buscar ciudades, lugares..."
+              placeholder="Buscar ciudades, lugares..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="search-input glass-effect"
@@ -265,6 +269,12 @@ const MainApp = () => {
         <div className="flex items-center gap-6">
           {user ? (
             <>
+              <button 
+                onClick={() => setShowSettings(true)}
+                className="btn-secondary flex items-center gap-2"
+              >
+                Ajustes
+              </button>
               <div className="relative">
                 <button 
                   onClick={() => setShowProfile(!showProfile)}
@@ -281,17 +291,29 @@ const MainApp = () => {
                       <p className="text-sm text-gray-300">{user.email}</p>
                     </div>
                     <div className="p-4">
-                      <button className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 transition">
-                         Mi Perfil
+                      <button 
+                        onClick={() => {
+                          setShowProfile(false);
+                          setShowPhotoModal(true);
+                        }}
+                        className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 transition"
+                      >
+                        Cambiar Foto de Perfil
                       </button>
-                      <button className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 transition">
-                         Estadísticas
+                      <button 
+                        onClick={() => {
+                          setShowProfile(false);
+                          setShowPasswordModal(true);
+                        }}
+                        className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 transition"
+                      >
+                        Cambiar Contraseña
                       </button>
                       <button 
                         onClick={handleLogout}
                         className="w-full text-left px-4 py-3 rounded-xl hover:bg-red-500/20 text-red-400 transition"
                       >
-                         Cerrar Sesión
+                        Cerrar Sesión
                       </button>
                     </div>
                   </div>
@@ -315,6 +337,102 @@ const MainApp = () => {
         onClose={() => setShowAuthModal(false)}
         onLogin={handleLogin}
       />
+
+      {/* Modal de Cambiar Contraseña */}
+      <ChangePasswordModal 
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+      />
+
+      {/* Modal de Cambiar Foto */}
+      <ChangePhotoModal 
+        isOpen={showPhotoModal}
+        onClose={() => setShowPhotoModal(false)}
+        user={user}
+      />
+
+      {/* Modal de Ajustes */}
+      {showSettings && (
+        <div className="modal-overlay">
+          <div className="modal-content max-w-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gradient">
+                Ajustes y Configuración
+              </h2>
+              <button 
+                onClick={() => setShowSettings(false)}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {/* Configuración de la aplicación */}
+              <div className="glass-effect rounded-xl p-4">
+                <h3 className="text-lg font-semibold mb-3">Configuración de la Aplicación</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-3">
+                    <span>Modo Oscuro</span>
+                    <input type="checkbox" className="toggle" defaultChecked />
+                  </div>
+                  <div className="flex justify-between items-center p-3">
+                    <span>Reproducción Automática</span>
+                    <input type="checkbox" className="toggle" />
+                  </div>
+                  <div className="flex justify-between items-center p-3">
+                    <span>Calidad de Video</span>
+                    <select className="bg-gray-700 text-white px-3 py-1 rounded">
+                      <option>Alta</option>
+                      <option>Media</option>
+                      <option>Baja</option>
+                    </select>
+                  </div>
+                  <div className="flex justify-between items-center p-3">
+                    <span>Notificaciones</span>
+                    <input type="checkbox" className="toggle" defaultChecked />
+                  </div>
+                </div>
+              </div>
+
+              {/* Historial */}
+              <div className="glass-effect rounded-xl p-4">
+                <h3 className="text-lg font-semibold mb-3">Historial</h3>
+                <div className="space-y-3">
+                  <button className="w-full text-left p-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition">
+                    Ver Historial de Videos Vistos
+                  </button>
+                  <button className="w-full text-left p-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition">
+                    Ver Historial de Búsquedas
+                  </button>
+                  <button className="w-full text-left p-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition">
+                    Limpiar Historial Completo
+                  </button>
+                  <button className="w-full text-left p-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition">
+                    Descargar Mis Datos
+                  </button>
+                </div>
+              </div>
+
+              {/* Privacidad y Seguridad */}
+              <div className="glass-effect rounded-xl p-4">
+                <h3 className="text-lg font-semibold mb-3">Privacidad y Seguridad</h3>
+                <div className="space-y-3">
+                  <button className="w-full text-left p-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition">
+                    Configuración de Privacidad
+                  </button>
+                  <button className="w-full text-left p-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition">
+                    Gestionar Dispositivos Conectados
+                  </button>
+                  <button className="w-full text-left p-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition">
+                    Exportar Datos de la Cuenta
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Contenido principal */}
       <div className="flex-1 flex pt-20">
@@ -347,7 +465,7 @@ const MainApp = () => {
                   className="cursor-pointer text-3xl transform hover:scale-150 transition-all duration-300"
                   title="Click para vista previa, Doble click para ver completo"
                 >
-                  {video.isPopular ? '' : video.isOther ? '' : '📍'}
+                  📍
                 </div>
               </Marker>
             ))}
@@ -357,7 +475,7 @@ const MainApp = () => {
             onClick={() => getUserLocation(true)}
             className="absolute bottom-6 right-6 btn-success text-lg font-bold px-6 py-3 rounded-2xl shadow-2xl"
           >
-            🌍 Mi Ubicación
+            Mi Ubicación
           </button>
         </div>
 
@@ -366,10 +484,10 @@ const MainApp = () => {
           {/* Header del sidebar */}
           <div className="text-center mb-6">
             <h2 className="text-3xl font-bold bg-gradient-to-r from-yellow-400 via-red-400 to-pink-400 bg-clip-text text-transparent">
-               Videos Destacados
+              Videos con Vista Previa
             </h2>
             <p className="text-cyan-300 text-sm mt-2">
-              {isUsingCurrentLocation ? '📍 Basado en tu ubicación actual' : '🌎 Explorando México'}
+              {isUsingCurrentLocation ? 'Basado en tu ubicación actual' : 'Explorando México'}
             </p>
           </div>
 
@@ -380,8 +498,6 @@ const MainApp = () => {
               disabled={!userLocation}
               className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-bold py-3 px-4 rounded-2xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
             >
-              <span className="text-lg">🔄</span>
-              <br />
               Otros Videos
             </button>
             <button
@@ -389,8 +505,6 @@ const MainApp = () => {
               disabled={!userLocation}
               className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold py-3 px-4 rounded-2xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
             >
-              <span className="text-lg">🔥</span>
-              <br />
               Populares
             </button>
           </div>
@@ -400,7 +514,7 @@ const MainApp = () => {
             <div className="glass-effect rounded-2xl p-4 mb-6 border-2 border-cyan-500/50">
               <div className="text-center mb-3">
                 <h3 className="text-lg font-bold text-cyan-300">
-                   Vista Previa: {selectedVideo.location_name}
+                  Vista Previa: {selectedVideo.location_name}
                 </h3>
               </div>
               <div className="bg-black rounded-lg overflow-hidden mb-3">
@@ -422,19 +536,19 @@ const MainApp = () => {
                   onClick={() => setSelectedVideo(null)}
                   className="bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300"
                 >
-                  ✕ Cerrar
+                  Cerrar
                 </button>
                 <button 
                   onClick={handleWatchComplete}
                   className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300 transform hover:scale-105"
                 >
-                   Ver Completo
+                  Ver Completo
                 </button>
               </div>
             </div>
           )}
 
-          {/* Lista de videos */}
+          {/* Lista de videos con miniaturas */}
           <div className="space-y-4 flex-1 overflow-y-auto">
             {videos.length > 0 ? (
               videos.map((video) => (
@@ -449,19 +563,29 @@ const MainApp = () => {
                   } ${selectedVideo?.youtube_video_id === video.youtube_video_id ? 'ring-2 ring-yellow-400' : ''}`}
                   title="Click para vista previa, Doble click para ver completo"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className={`text-2xl ${
-                      video.isPopular ? 'text-orange-400' :
-                      video.isOther ? 'text-cyan-400' :
-                      'text-green-400'
-                    }`}>
-                      {video.isPopular ? '' : video.isOther ? '' : '📍'}
+                  <div className="flex gap-4">
+                    {/* Miniaturas de vista previa */}
+                    <div className="flex-shrink-0">
+                      <img 
+                        src={`https://img.youtube.com/vi/${video.youtube_video_id}/mqdefault.jpg`}
+                        alt="Miniatura del video"
+                        className="w-20 h-15 rounded-lg object-cover"
+                      />
                     </div>
                     <div className="flex-1">
-                      <p className="font-bold text-white">{video.location_name}</p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className={`text-lg ${
+                          video.isPopular ? 'text-orange-400' :
+                          video.isOther ? 'text-cyan-400' :
+                          'text-green-400'
+                        }`}>
+                          📍
+                        </div>
+                        <p className="font-bold text-white text-sm">{video.location_name}</p>
+                      </div>
                       <p className="text-xs text-gray-300">ID: {video.youtube_video_id}</p>
                       {video.views && (
-                        <p className="text-xs text-yellow-300">👁️ {video.views.toLocaleString()} views</p>
+                        <p className="text-xs text-yellow-300">{video.views.toLocaleString()} views</p>
                       )}
                     </div>
                   </div>
