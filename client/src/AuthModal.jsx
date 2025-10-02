@@ -12,6 +12,37 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
   const [error, setError] = useState('');
   const [googleLoaded, setGoogleLoaded] = useState(false);
 
+  const [passwordValidations, setPasswordValidations] = useState({
+    length: false,
+    uppercase: false,
+    number: false,
+    special: false,
+  });
+
+  const passwordRules = {
+    length: (pwd) => pwd.length >= 8,
+    uppercase: (pwd) => /[A-Z]/.test(pwd),
+    number: (pwd) => /\d/.test(pwd),
+    special: (pwd) => /[^A-Za-z0-9]/.test(pwd),
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value,
+    });
+
+    if (name === "password") {
+      setPasswordValidations({
+        length: passwordRules.length(value),
+        uppercase: passwordRules.uppercase(value),
+        number: passwordRules.number(value),
+        special: passwordRules.special(value),
+      });
+    }
+  };
+
   useEffect(() => {
     if (isOpen && !googleLoaded) {
       loadGoogleScript();
@@ -63,7 +94,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
     try {
       setLoading(true);
       setError('');
-      
+
       console.log('Google response received:', response);
 
       const backendResponse = await fetch('http://localhost:3001/api/auth/google', {
@@ -84,7 +115,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       localStorage.setItem('user', JSON.stringify(data.user));
       onLogin(data.user);
       onClose();
-      
+
     } catch (err) {
       console.error('Google auth error:', err);
       setError(err.message || 'Error en autenticación con Google');
@@ -106,7 +137,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
 
     try {
       const endpoint = isLogin ? '/login' : '/register';
-      const payload = isLogin 
+      const payload = isLogin
         ? { email: formData.email, password: formData.password }
         : { nombre: formData.nombre, email: formData.email, password: formData.password };
 
@@ -128,7 +159,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       localStorage.setItem('user', JSON.stringify(data.user));
       onLogin(data.user);
       onClose();
-      
+
     } catch (err) {
       setError(err.message);
     } finally {
@@ -136,12 +167,12 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
     }
   };
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
+  // const handleChange = (e) => {
+  //   setFormData({
+  //     ...formData,
+  //     [e.target.name]: e.target.value
+  //   });
+  // };
 
   const switchMode = () => {
     setIsLogin(!isLogin);
@@ -154,6 +185,8 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
     });
   };
 
+
+
   return (
     <div className="modal-overlay">
       <div className="modal-content max-w-md">
@@ -161,7 +194,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
           <h2 className="text-2xl font-bold text-gradient">
             {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
           </h2>
-          <button 
+          <button
             onClick={onClose}
             className="text-gray-400 hover:text-white text-2xl"
           >
@@ -177,12 +210,12 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
 
         {/* Botón de Google */}
         <div className="mb-6">
-          <div 
+          <div
             id="googleButton"
             className="flex justify-center"
           >
             {googleLoaded ? (
-              <div 
+              <div
                 id="g_id_onload"
                 data-client_id="369281279205-i1b62ojhbhq6jel1oh8li22o1aklklqj.apps.googleusercontent.com"
                 data-context="signin"
@@ -192,17 +225,17 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
               >
               </div>
             ) : null}
-            
+
             <button
               onClick={handleGoogleAuth}
               disabled={loading || !googleLoaded}
               className="w-full bg-white text-gray-800 hover:bg-gray-100 font-semibold py-3 px-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-3 border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
               </svg>
               {loading ? 'Cargando...' : 'Continuar con Google'}
             </button>
@@ -252,6 +285,19 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
             />
           </div>
 
+          {/* <div>
+            <label className="block text-sm font-medium mb-2">Contraseña</label>
+            <input
+              type="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              required
+              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="••••••••"
+            />
+          </div> */}
+
           <div>
             <label className="block text-sm font-medium mb-2">Contraseña</label>
             <input
@@ -263,7 +309,24 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
               className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="••••••••"
             />
+
+            {/* Indicadores de validación */}
+            <ul className="mt-2 text-sm space-y-1">
+              <li className={passwordValidations.length ? "text-green-400" : "text-red-400"}>
+                {passwordValidations.length ? "✔" : "✖"} Al menos 8 caracteres
+              </li>
+              <li className={passwordValidations.uppercase ? "text-green-400" : "text-red-400"}>
+                {passwordValidations.uppercase ? "✔" : "✖"} Una letra mayúscula
+              </li>
+              <li className={passwordValidations.number ? "text-green-400" : "text-red-400"}>
+                {passwordValidations.number ? "✔" : "✖"} Un número
+              </li>
+              <li className={passwordValidations.special ? "text-green-400" : "text-red-400"}>
+                {passwordValidations.special ? "✔" : "✖"} Un carácter especial
+              </li>
+            </ul>
           </div>
+
 
           {!isLogin && (
             <div>
