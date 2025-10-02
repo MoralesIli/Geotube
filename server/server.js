@@ -198,6 +198,54 @@ app.get('/api/auth/profile', authenticateToken, async (req, res) => {
   }
 });
 
+// Ruta para actualizar perfil
+app.put('/api/auth/profile', authenticateToken, async (req, res) => {
+  try {
+    const { nombre, email } = req.body;
+    
+    await db.promise().execute(
+      'UPDATE usuarios SET nombre = ?, email = ? WHERE id = ?',
+      [nombre, email, req.user.id]
+    );
+
+    res.json({ message: 'Perfil actualizado correctamente' });
+  } catch (error) {
+    console.error('Error actualizando perfil:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Ruta para cambiar contraseña
+app.post('/api/auth/change-password', authenticateToken, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    // Verificar contraseña actual
+    const [users] = await db.promise().execute(
+      'SELECT password FROM usuarios WHERE id = ?',
+      [req.user.id]
+    );
+
+    const validPassword = await bcrypt.compare(currentPassword, users[0].password);
+    if (!validPassword) {
+      return res.status(400).json({ error: 'Contraseña actual incorrecta' });
+    }
+
+    // Hash nueva contraseña
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await db.promise().execute(
+      'UPDATE usuarios SET password = ? WHERE id = ?',
+      [hashedPassword, req.user.id]
+    );
+
+    res.json({ message: 'Contraseña cambiada correctamente' });
+  } catch (error) {
+    console.error('Error cambiando contraseña:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
 // ==================== RUTAS PRINCIPALES ====================
 
 // Función para buscar videos en YouTube por ubicación
@@ -424,4 +472,110 @@ app.listen(port, () => {
   console.log(` Servidor corriendo en http://localhost:${port}`);
   console.log(` API disponible en http://localhost:${port}/api`);
   console.log(` Rutas de autenticación en http://localhost:${port}/api/auth`);
+});
+
+const { OAuth2Client } = require('google-auth-library');
+
+// Configura el cliente de Google OAuth
+const GOOGLE_CLIENT_ID = '369281279205-i1b62ojhbhq6jel1oh8li22o1aklklqj.apps.googleusercontent.com';
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+
+// Ruta para autenticación con Google
+app.post('/api/auth/google', async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ error: 'Token de Google es requerido' });
+    }
+
+    // Verificar el token con Google
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name, picture } = payload;
+
+    // Verificar si el usuario ya existe en la base de datos
+    const [existingUsers] = await db.promise().execute(
+      'SELECT * FROM usuarios WHERE email = ? OR google_id = ?',
+      [email, googleId]
+    );
+
+    let user;
+
+    if (existingUsers.length > 0) {
+      // Usuario existe, actualizar información de Google si es necesario
+      user = existingUsers[0];
+      if (!user.google_id) {
+        await db.promise().execute(
+          'UPDATE usuarios SET google_id = ?, foto = ? WHERE id = ?',
+          [googleId, picture, user.id]
+        );
+      }
+    } else {
+      // Crear nuevo usuario
+      const [result] = await db.promise().execute(
+        'INSERT INTO usuarios (nombre, email, google_id, foto, password) VALUES (?, ?, ?, ?, ?)',
+        [name, email, googleId, picture, ''] // Password vacío para usuarios de Google
+      );
+
+      user = {
+        id: result.insertId,
+        nombre: name,
+        email: email,
+        google_id: googleId,
+        foto: picture
+      };
+    }
+
+    // Generar token JWT
+    const jwtToken = jwt.sign(
+      { 
+        id: user.id, 
+        email: user.email,
+        googleId: googleId 
+      },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.json({
+      message: 'Autenticación con Google exitosa',
+      token: jwtToken,
+      user: {
+        id: user.id,
+        nombre: user.nombre,
+        email: user.email,
+        foto: user.foto
+      }
+    });
+
+  } catch (error) {
+    console.error('Error en autenticación con Google:', error);
+    res.status(500).json({ error: 'Error en autenticación con Google' });
+  }
+});
+
+// Ruta para obtener usuario por Google ID
+app.get('/api/auth/google/:googleId', async (req, res) => {
+  try {
+    const { googleId } = req.params;
+
+    const [users] = await db.promise().execute(
+      'SELECT id, nombre, email, foto FROM usuarios WHERE google_id = ?',
+      [googleId]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    res.json({ user: users[0] });
+  } catch (error) {
+    console.error('Error obteniendo usuario de Google:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
 });
