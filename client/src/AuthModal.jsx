@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FaEye, FaEyeSlash } from 'react-icons/fa';
 
 const AuthModal = ({ isOpen, onClose, onLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
@@ -10,6 +11,8 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [errorMail, setErrorMail] = useState('');
+  const [errorRepeat, setErrorRepeat] = useState('');
   const [googleLoaded, setGoogleLoaded] = useState(false);
 
   const [passwordValidations, setPasswordValidations] = useState({
@@ -18,12 +21,20 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
     number: false,
     special: false,
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const passwordRules = {
     length: (pwd) => pwd.length >= 8,
     uppercase: (pwd) => /[A-Z]/.test(pwd),
     number: (pwd) => /\d/.test(pwd),
     special: (pwd) => /[^A-Za-z0-9]/.test(pwd),
+  };
+
+  const validarEmail = (email) => {
+    // Esta regex valida emails básicos (algo@dominio.com)
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return regex.test(email);
   };
 
   const handleChange = (e) => {
@@ -41,13 +52,48 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
         special: passwordRules.special(value),
       });
     }
+
+    if (name === "confirmPassword") {
+      if (value !== formData.password) {
+        setErrorRepeat("Las contraseñas no coinciden");
+      } else {
+        setErrorRepeat("");
+      }
+    }
+
+    if (name === 'email' && !isLogin) {
+      if (!validarEmail(value)) {
+        setErrorMail('Email no válido');
+      } else {
+        setErrorMail('');
+      }
+    }
   };
 
+  // useEffect(() => {
+  //   if (isOpen && !googleLoaded) {
+  //     loadGoogleScript();
+  //   }
+  // }, [isOpen, googleLoaded]);
+
   useEffect(() => {
-    if (isOpen && !googleLoaded) {
+  if (isOpen) {
+    setIsLogin(true);
+
+    // limpiar
+    setFormData({ nombre: '', email: '', password: '', confirmPassword: '' });
+    setError('');
+    setErrorMail('');
+    setErrorRepeat('');
+    setPasswordValidations({ length: false, uppercase: false, number: false, special: false });
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+
+    if (!googleLoaded) {
       loadGoogleScript();
     }
-  }, [isOpen, googleLoaded]);
+  }
+}, [isOpen, googleLoaded]);
 
   const loadGoogleScript = () => {
     if (window.google) {
@@ -129,11 +175,38 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
     setLoading(true);
     setError('');
 
-    if (!isLogin && formData.password !== formData.confirmPassword) {
-      setError('Las contraseñas no coinciden');
+    //validar email
+    if (!validarEmail(formData.email)) {
+      setError('Email no válido');
       setLoading(false);
       return;
     }
+
+    if (!isLogin) {
+      const { password, confirmPassword } = formData;
+
+      if (password !== confirmPassword) {
+        setError('Las contraseñas no coinciden');
+        setLoading(false);
+        return;
+      }
+
+      const isValidPassword =
+        passwordRules.length(password) &&
+        passwordRules.uppercase(password) &&
+        passwordRules.number(password) &&
+        passwordRules.special(password);
+
+      if (!isValidPassword) {
+        setError('La contraseña no cumple con los requisitos de seguridad');
+        setLoading(false);
+        return;
+      }
+
+    }
+
+
+
 
     try {
       const endpoint = isLogin ? '/login' : '/register';
@@ -159,6 +232,12 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       localStorage.setItem('user', JSON.stringify(data.user));
       onLogin(data.user);
       onClose();
+
+      setFormData({ nombre: '', email: '', password: '', confirmPassword: '' });
+      setError('');
+      setPasswordValidations({ length: false, uppercase: false, number: false, special: false });
+      setShowPassword(false);
+      setShowConfirmPassword(false);
 
     } catch (err) {
       setError(err.message);
@@ -283,6 +362,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
               className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="tu@email.com"
             />
+            {errorMail && <p className="text-red-500 text-sm mt-1">{errorMail}</p>}
           </div>
 
           {/* <div>
@@ -298,10 +378,10 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
             />
           </div> */}
 
-          <div>
+          <div className="relative">
             <label className="block text-sm font-medium mb-2">Contraseña</label>
             <input
-              type="password"
+              type={showPassword ? "text" : "password"}
               name="password"
               value={formData.password}
               onChange={handleChange}
@@ -309,30 +389,41 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
               className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="••••••••"
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-10 text-gray-400 hover:text-white focus:outline-none"
+            >
+              {showPassword ? <FaEyeSlash size={20} /> : <FaEye size={20} />}
+            </button>
 
-            {/* Indicadores de validación */}
-            <ul className="mt-2 text-sm space-y-1">
-              <li className={passwordValidations.length ? "text-green-400" : "text-red-400"}>
-                {passwordValidations.length ? "✔" : "✖"} Al menos 8 caracteres
-              </li>
-              <li className={passwordValidations.uppercase ? "text-green-400" : "text-red-400"}>
-                {passwordValidations.uppercase ? "✔" : "✖"} Una letra mayúscula
-              </li>
-              <li className={passwordValidations.number ? "text-green-400" : "text-red-400"}>
-                {passwordValidations.number ? "✔" : "✖"} Un número
-              </li>
-              <li className={passwordValidations.special ? "text-green-400" : "text-red-400"}>
-                {passwordValidations.special ? "✔" : "✖"} Un carácter especial
-              </li>
-            </ul>
+            {/* Indicadores de validación */
+              !isLogin && (
+                <ul className="mt-2 text-sm space-y-1">
+                  <li className={passwordValidations.length ? "text-green-400" : "text-red-400"}>
+                    {passwordValidations.length ? "✔" : "✖"} Al menos 8 caracteres
+                  </li>
+                  <li className={passwordValidations.uppercase ? "text-green-400" : "text-red-400"}>
+                    {passwordValidations.uppercase ? "✔" : "✖"} Una letra mayúscula
+                  </li>
+                  <li className={passwordValidations.number ? "text-green-400" : "text-red-400"}>
+                    {passwordValidations.number ? "✔" : "✖"} Un número
+                  </li>
+                  <li className={passwordValidations.special ? "text-green-400" : "text-red-400"}>
+                    {passwordValidations.special ? "✔" : "✖"} Un carácter especial
+                  </li>
+                </ul>
+              )
+            }
+
           </div>
 
 
           {!isLogin && (
-            <div>
+            <div className="relative">
               <label className="block text-sm font-medium mb-2">Confirmar contraseña</label>
               <input
-                type="password"
+                type={showConfirmPassword ? "text" : "password"}
                 name="confirmPassword"
                 value={formData.confirmPassword}
                 onChange={handleChange}
@@ -340,6 +431,14 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
                 className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="••••••••"
               />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-10 text-gray-400 hover:text-white focus:outline-none"
+              >
+                {showConfirmPassword ? <FaEyeSlash size={20} /> : <FaEye size={20} />}
+              </button>
+              {errorRepeat && <p className="text-red-500 text-sm mt-1">{errorRepeat}</p>}
             </div>
           )}
 
