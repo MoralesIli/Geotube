@@ -11,11 +11,12 @@ const MainApp = () => {
   const [viewport, setViewport] = useState({
     latitude: 23.6345,
     longitude: -102.5528,
-    zoom: 4,
+    zoom: 3,
   });
   const [targetViewport, setTargetViewport] = useState(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const animationRef = useRef();
+  const startViewportRef = useRef(null);
 
   const [userLocation, setUserLocation] = useState(null);
   const [userLocationName, setUserLocationName] = useState('');
@@ -35,28 +36,28 @@ const MainApp = () => {
   const MAPBOX_TOKEN = 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
   const YOUTUBE_API_KEY = 'AIzaSyCi_KpytxXFwg6wCQKTYoCiVffiFRoGlsQ';
 
-  // 🔥 OPTIMIZADO: Efecto para animación del mapa más rápido
+  // 🔥 Animación del mapa corregida
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (targetViewport && !isAnimating) {
+    if (targetViewport) {
+      startViewportRef.current = viewport;
       setIsAnimating(true);
-      
-      const startViewport = { ...viewport };
-      const endViewport = { ...targetViewport };
-      const duration = 1000; // 🔥 Reducido de 1500ms a 1000ms
+
       const startTime = performance.now();
+      const duration = 1000;
 
       const animateMap = (currentTime) => {
         const elapsed = currentTime - startTime;
         const progress = Math.min(elapsed / duration, 1);
-        
-        // 🔥 FUNCIÓN EASING MÁS RÁPIDA
-        const easeOutQuad = (t) => t * (2 - t);
-        const easedProgress = easeOutQuad(progress);
+        const easedProgress = progress * (2 - progress);
+
+        const start = startViewportRef.current;
+        const end = targetViewport;
 
         setViewport({
-          latitude: startViewport.latitude + (endViewport.latitude - startViewport.latitude) * easedProgress,
-          longitude: startViewport.longitude + (endViewport.longitude - startViewport.longitude) * easedProgress,
-          zoom: startViewport.zoom + (endViewport.zoom - startViewport.zoom) * easedProgress,
+          latitude: start.latitude + (end.latitude - start.latitude) * easedProgress,
+          longitude: start.longitude + (end.longitude - start.longitude) * easedProgress,
+          zoom: start.zoom + (end.zoom - start.zoom) * easedProgress,
         });
 
         if (progress < 1) {
@@ -68,12 +69,12 @@ const MainApp = () => {
       };
 
       animationRef.current = requestAnimationFrame(animateMap);
-
-      return () => {
-        animationRef.current && cancelAnimationFrame(animationRef.current);
-      };
     }
-  }, [targetViewport, isAnimating, viewport]);
+
+    return () => {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    };
+  }, [targetViewport]); // 👈 Solo depende de targetViewport
 
   // 🔥 OPTIMIZADO: Función para obtener nombre de ubicación más rápida
   const getLocationName = useCallback(async (lat, lng) => {
@@ -86,7 +87,6 @@ const MainApp = () => {
       
       const data = await response.json();
       
-      // 🔥 OBTENER SOLO EL PRIMER RESULTADO MÁS RÁPIDO
       if (data.features?.[0]) {
         return data.features[0].place_name;
       }
@@ -276,24 +276,21 @@ const MainApp = () => {
   const loadVideosForLocation = useCallback(async (latitude, longitude, locationName) => {
     setLoadingVideos(true);
     
-    // 🔥 USAR setTimeout PARA NO BLOQUEAR LA INTERFAZ
-    setTimeout(async () => {
-      try {
-        const youtubeVideos = await searchYouTubeVideosByLocation(latitude, longitude, locationName);
-        
-        if (youtubeVideos.length > 0) {
-          setVideos(youtubeVideos);
-          setActiveFilter('current');
-        } else {
-          await fetchPopularMexicoVideos();
-        }
-      } catch (err) {
-        console.error('Error buscando videos:', err);
+    try {
+      const youtubeVideos = await searchYouTubeVideosByLocation(latitude, longitude, locationName);
+      
+      if (youtubeVideos.length > 0) {
+        setVideos(youtubeVideos);
+        setActiveFilter('current');
+      } else {
         await fetchPopularMexicoVideos();
-      } finally {
-        setLoadingVideos(false);
       }
-    }, 100); // 🔥 Pequeño delay para no bloquear la UI
+    } catch (err) {
+      console.error('Error buscando videos:', err);
+      await fetchPopularMexicoVideos();
+    } finally {
+      setLoadingVideos(false);
+    }
   }, [searchYouTubeVideosByLocation, fetchPopularMexicoVideos]);
 
   // Búsqueda de videos por término
@@ -344,22 +341,19 @@ const MainApp = () => {
     }
   }, [YOUTUBE_API_KEY]);
 
-  // 🔥 OPTIMIZADO: Función para obtener ubicación del usuario con movimiento inmediato
+  // 🔥 CORREGIDO: Función para obtener ubicación del usuario
   const getUserLocation = useCallback(async (recenter = true) => {
     if (!navigator.geolocation) {
       alert('La geolocalización no es compatible con este navegador.');
       return fetchPopularMexicoVideos();
     }
 
-    // Mostrar indicador de carga inmediatamente
-    setIsAnimating(true);
-
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
         console.log('Ubicación obtenida:', latitude, longitude);
         
-        // 🔥 MOVER EL MAPA INMEDIATAMENTE
+        // 🔥 MOVER EL MAPA CON ANIMACIÓN
         setTargetViewport({ 
           latitude: latitude, 
           longitude: longitude, 
@@ -369,19 +363,15 @@ const MainApp = () => {
         // 🔥 ACTUALIZAR ESTADOS DE UBICACIÓN
         setUserLocation({ latitude, longitude });
 
-        // 🔥 OBTENER NOMBRE DE UBICACIÓN EN PARALELO CON LA ANIMACIÓN
-        const locationNamePromise = getLocationName(latitude, longitude);
-        
-        // 🔥 CARGAR VIDEOS EN PARALELO
-        const videosPromise = loadVideosForLocation(latitude, longitude, 'Cargando ubicación...');
-
         try {
-          // Esperar ambas promesas en paralelo
-          const [locationName] = await Promise.all([locationNamePromise]);
-          
+          // 🔥 CORREGIDO: Obtener nombre de ubicación y cargar videos
+          const locationName = await getLocationName(latitude, longitude);
           setUserLocationName(locationName);
           
-          // Guardar en localStorage (no bloqueante)
+          // Cargar videos para esta ubicación
+          await loadVideosForLocation(latitude, longitude, locationName);
+
+          // Guardar en localStorage
           localStorage.setItem('userLocation', JSON.stringify({ 
             latitude, 
             longitude,
@@ -389,21 +379,20 @@ const MainApp = () => {
           }));
 
         } catch (error) {
-          console.error('Error en operaciones paralelas:', error);
+          console.error('Error en operaciones:', error);
           setUserLocationName('Ubicación actual');
         }
-        // La animación se detendrá automáticamente cuando termine
       },
       (err) => {
         console.error('Error obteniendo ubicación:', err);
-        setIsAnimating(false); // 🔥 IMPORTANTE: Detener animación en caso de error
+        setIsAnimating(false);
         alert('No se pudo obtener tu ubicación. Asegúrate de permitir el acceso a la ubicación.');
         fetchPopularMexicoVideos();
       },
       { 
         enableHighAccuracy: true,
-        timeout: 10000, // 🔥 Reducido de 15s a 10s
-        maximumAge: 30000 // 🔥 Reducido de 60s a 30s para datos más frescos
+        timeout: 10000,
+        maximumAge: 30000
       }
     );
   }, [getLocationName, loadVideosForLocation, fetchPopularMexicoVideos]);
