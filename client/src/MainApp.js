@@ -38,8 +38,36 @@ const MainApp = () => {
   const MAPBOX_TOKEN = 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
   const YOUTUBE_API_KEY = 'AIzaSyCi_KpytxXFwg6wCQKTYoCiVffiFRoGlsQ';
 
+  // 🔥 NUEVO: Verificar autenticación al cargar el componente
+  useEffect(() => {
+    const checkAuthStatus = () => {
+      const token = localStorage.getItem('token');
+      const userData = localStorage.getItem('user');
+      
+      console.log('🔍 Verificando autenticación...');
+      console.log('Token en localStorage:', token ? 'Presente' : 'Ausente');
+      console.log('User data en localStorage:', userData);
+      
+      if (token && userData) {
+        try {
+          const user = JSON.parse(userData);
+          console.log('✅ Usuario autenticado recuperado:', user);
+          setUser(user);
+          setShowProfile(true);
+        } catch (error) {
+          console.error('❌ Error parsing user data:', error);
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
+      } else {
+        console.log('⚠️ No hay usuario autenticado');
+      }
+    };
+
+    checkAuthStatus();
+  }, []);
+
   // Animación del mapa corregida
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (targetViewport) {
       startViewportRef.current = viewport;
@@ -575,17 +603,33 @@ const MainApp = () => {
     initializeApp();
   }, [loadVideosForLocation, fetchPopularMexicoVideos]);
 
-  // Handlers de autenticación
+  // 🔥 CORREGIDO: Handlers de autenticación
   const handleLogin = (userData) => {
+    console.log('✅ Login exitoso:', userData);
+    
+    // Asegurarse de que los datos se guarden en localStorage
+    if (userData && !localStorage.getItem('user')) {
+      localStorage.setItem('user', JSON.stringify(userData));
+    }
+    
     setUser(userData);
     setShowProfile(true);
+    setShowAuthModal(false);
   };
 
   const handleLogout = () => {
+    console.log('🔒 Cerrando sesión...');
+    
+    // Limpiar todo del localStorage
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    
+    // Resetear estado
     setUser(null);
     setShowProfile(false);
+    setShowSettings(false);
+    
+    console.log('✅ Sesión cerrada correctamente');
   };
 
   // Handlers de videos
@@ -650,6 +694,10 @@ const MainApp = () => {
       ? `${hours}:${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}`
       : `${minutes}:${seconds.padStart(2, '0')}`;
   };
+
+  // 🔥 NUEVO: Debug info
+  console.log('🔄 MainApp - Estado user:', user);
+  console.log('🔄 MainApp - localStorage user:', localStorage.getItem('user'));
 
   return (
     <div className="flex h-screen w-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 text-white overflow-hidden">
