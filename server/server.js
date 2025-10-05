@@ -12,7 +12,7 @@ const port = 3001;
 const db = mysql.createConnection({
   host: 'localhost',
   user: 'root',
-  password: 'admin',
+  password: '12345',
   database: 'geotube_db',
 });
 

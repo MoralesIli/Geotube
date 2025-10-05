@@ -32,7 +32,6 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
   };
 
   const validarEmail = (email) => {
-    // Esta regex valida emails básicos (algo@dominio.com)
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return regex.test(email);
   };
@@ -70,30 +69,24 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
     }
   };
 
-  // useEffect(() => {
-  //   if (isOpen && !googleLoaded) {
-  //     loadGoogleScript();
-  //   }
-  // }, [isOpen, googleLoaded]);
-
   useEffect(() => {
-  if (isOpen) {
-    setIsLogin(true);
+    if (isOpen) {
+      setIsLogin(true);
 
-    // limpiar
-    setFormData({ nombre: '', email: '', password: '', confirmPassword: '' });
-    setError('');
-    setErrorMail('');
-    setErrorRepeat('');
-    setPasswordValidations({ length: false, uppercase: false, number: false, special: false });
-    setShowPassword(false);
-    setShowConfirmPassword(false);
+      // limpiar
+      setFormData({ nombre: '', email: '', password: '', confirmPassword: '' });
+      setError('');
+      setErrorMail('');
+      setErrorRepeat('');
+      setPasswordValidations({ length: false, uppercase: false, number: false, special: false });
+      setShowPassword(false);
+      setShowConfirmPassword(false);
 
-    if (!googleLoaded) {
-      loadGoogleScript();
+      if (!googleLoaded) {
+        loadGoogleScript();
+      }
     }
-  }
-}, [isOpen, googleLoaded]);
+  }, [isOpen, googleLoaded]);
 
   const loadGoogleScript = () => {
     if (window.google) {
@@ -105,8 +98,12 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
     script.src = 'https://accounts.google.com/gsi/client';
     script.async = true;
     script.defer = true;
-    script.onload = () => setGoogleLoaded(true);
+    script.onload = () => {
+      console.log('✅ Google Auth script cargado correctamente');
+      setGoogleLoaded(true);
+    };
     script.onerror = () => {
+      console.error('❌ Error cargando Google Auth script');
       setError('Error al cargar Google Auth');
       setGoogleLoaded(false);
     };
@@ -122,13 +119,33 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
     }
 
     try {
+      console.log('🚀 Inicializando Google Auth...');
+      
       window.google.accounts.id.initialize({
         client_id: '369281279205-i1b62ojhbhq6jel1oh8li22o1aklklqj.apps.googleusercontent.com',
         callback: handleGoogleResponse,
+        context: 'signin',
+        ux_mode: 'popup',
+        auto_prompt: false
       });
 
-      // Mostrar el One Tap
-      window.google.accounts.id.prompt();
+      // Lanzar el popup de Google directamente
+      window.google.accounts.id.prompt((notification) => {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          // Si no se muestra automáticamente, mostrar el botón manual
+          console.log('Mostrando botón manual de Google');
+          window.google.accounts.id.renderButton(
+            document.getElementById('googleButton'),
+            { 
+              theme: 'outline', 
+              size: 'large',
+              text: 'continue_with',
+              shape: 'rectangular',
+              logo_alignment: 'left'
+            }
+          );
+        }
+      });
 
     } catch (error) {
       console.error('Error initializing Google Auth:', error);
@@ -141,7 +158,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       setLoading(true);
       setError('');
 
-      console.log('Google response received:', response);
+      console.log('🔑 Google response received:', response);
 
       const backendResponse = await fetch('http://localhost:3001/api/auth/google', {
         method: 'POST',
@@ -157,13 +174,18 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
         throw new Error(data.error || 'Error del servidor');
       }
 
+      console.log('✅ Login exitoso con Google:', data.user);
+      
+      // 🔥 CORREGIDO: Guardar datos en localStorage
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      
+      // 🔥 CORREGIDO: Llamar onLogin con los datos del usuario
       onLogin(data.user);
       onClose();
 
     } catch (err) {
-      console.error('Google auth error:', err);
+      console.error('❌ Google auth error:', err);
       setError(err.message || 'Error en autenticación con Google');
     } finally {
       setLoading(false);
@@ -202,17 +224,15 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
         setLoading(false);
         return;
       }
-
     }
-
-
-
 
     try {
       const endpoint = isLogin ? '/login' : '/register';
       const payload = isLogin
         ? { email: formData.email, password: formData.password }
         : { nombre: formData.nombre, email: formData.email, password: formData.password };
+
+      console.log('📤 Enviando datos a:', endpoint, payload);
 
       const response = await fetch(`http://localhost:3001/api/auth${endpoint}`, {
         method: 'POST',
@@ -228,11 +248,17 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
         throw new Error(data.error);
       }
 
+      console.log('✅ Login/Register exitoso:', data.user);
+      
+      // 🔥 CORREGIDO: Guardar datos en localStorage
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      
+      // 🔥 CORREGIDO: Llamar onLogin con los datos del usuario
       onLogin(data.user);
       onClose();
 
+      // Limpiar formulario
       setFormData({ nombre: '', email: '', password: '', confirmPassword: '' });
       setError('');
       setPasswordValidations({ length: false, uppercase: false, number: false, special: false });
@@ -240,18 +266,12 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       setShowConfirmPassword(false);
 
     } catch (err) {
+      console.error('❌ Error en auth:', err);
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
-
-  // const handleChange = (e) => {
-  //   setFormData({
-  //     ...formData,
-  //     [e.target.name]: e.target.value
-  //   });
-  // };
 
   const switchMode = () => {
     setIsLogin(!isLogin);
@@ -263,8 +283,6 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       confirmPassword: ''
     });
   };
-
-
 
   return (
     <div className="modal-overlay">
@@ -289,22 +307,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
 
         {/* Botón de Google */}
         <div className="mb-6">
-          <div
-            id="googleButton"
-            className="flex justify-center"
-          >
-            {googleLoaded ? (
-              <div
-                id="g_id_onload"
-                data-client_id="369281279205-i1b62ojhbhq6jel1oh8li22o1aklklqj.apps.googleusercontent.com"
-                data-context="signin"
-                data-ux_mode="popup"
-                data-callback="handleGoogleResponse"
-                data-auto_prompt="false"
-              >
-              </div>
-            ) : null}
-
+          <div id="googleButton" className="flex justify-center">
             <button
               onClick={handleGoogleAuth}
               disabled={loading || !googleLoaded}
@@ -365,19 +368,6 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
             {errorMail && <p className="text-red-500 text-sm mt-1">{errorMail}</p>}
           </div>
 
-          {/* <div>
-            <label className="block text-sm font-medium mb-2">Contraseña</label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="••••••••"
-            />
-          </div> */}
-
           <div className="relative">
             <label className="block text-sm font-medium mb-2">Contraseña</label>
             <input
@@ -415,9 +405,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
                 </ul>
               )
             }
-
           </div>
-
 
           {!isLogin && (
             <div className="relative">
@@ -465,16 +453,6 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       </div>
     </div>
   );
-};
-
-// Hacer la función de callback global para Google
-window.handleGoogleResponse = (response) => {
-  // Esta función será llamada por Google
-  const modal = document.querySelector('.modal-overlay');
-  if (modal) {
-    const event = new CustomEvent('googleAuthResponse', { detail: response });
-    modal.dispatchEvent(event);
-  }
 };
 
 export default AuthModal;

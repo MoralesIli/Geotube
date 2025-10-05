@@ -20,8 +20,23 @@ const VideoPlayer = () => {
   });
 
   const MAPBOX_TOKEN = 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
-// En tu código, asegúrate de usar esta API Key (la que proporcionaste)
-const YOUTUBE_API_KEY = 'AIzaSyCi_KpytxXFwg6wCQKTYoCiVffiFRoGlsQ';
+  const YOUTUBE_API_KEY = 'AIzaSyCi_KpytxXFwg6wCQKTYoCiVffiFRoGlsQ';
+
+  // 🔥 NUEVO: Verificar autenticación al cargar el componente
+  useEffect(() => {
+    const checkAuth = () => {
+      const userData = localStorage.getItem('user');
+      console.log('🎬 VideoPlayer - localStorage user:', userData);
+      if (!userData) {
+        console.log('⚠️ No hay usuario autenticado en VideoPlayer');
+      } else {
+        console.log('✅ Usuario encontrado en VideoPlayer:', JSON.parse(userData));
+      }
+    };
+    
+    checkAuth();
+  }, []);
+
   // Función para obtener datos del video desde YouTube API
   const fetchVideoData = async (videoId) => {
     try {
