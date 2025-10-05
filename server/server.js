@@ -4,6 +4,7 @@ const cors = require('cors');
 const axios = require('axios');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
 
 const app = express();
 const port = 3001;
@@ -22,18 +23,25 @@ db.connect((err) => {
     console.error('Error connecting to MySQL:', err.stack);
     return;
   }
-  console.log('Connected to MySQL as id ' + db.threadId);
+  console.log('✅ Connected to MySQL as id ' + db.threadId);
 });
 
 // Middleware para habilitar CORS y JSON
-app.use(cors());
-app.use(express.json());
+app.use(cors({
+  origin: 'http://localhost:3000',
+  credentials: true
+}));
+app.use(express.json({ limit: '10mb' })); // Aumentar límite para imágenes base64
 
 // API Keys
 const YOUTUBE_API_KEY = 'AIzaSyAMXqOfXkEHPmpu0O5a83k7c_snASAEJ50';
 const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
 
 const JWT_SECRET = 'tu_clave_secreta_super_segura_geotube_2024';
+
+// Configura el cliente de Google OAuth
+const GOOGLE_CLIENT_ID = '369281279205-i1b62ojhbhq6jel1oh8li22o1aklklqj.apps.googleusercontent.com';
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // Middleware para verificar token
 const authenticateToken = (req, res, next) => {
@@ -52,6 +60,12 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
+
+// ==================== RUTAS DE SALUD ====================
+
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', message: 'Servidor funcionando correctamente' });
+});
 
 // ==================== RUTAS DE AUTENTICACIÓN ====================
 
@@ -147,13 +161,105 @@ app.post('/api/auth/login', async (req, res) => {
       user: {
         id: user.id,
         nombre: user.nombre,
-        email: user.email
+        email: user.email,
+        foto: user.foto || null
       }
     });
 
   } catch (error) {
     console.error('Error en login:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Ruta para autenticación con Google
+app.post('/api/auth/google', async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ error: 'Token de Google es requerido' });
+    }
+
+    console.log('🔑 Verificando token de Google...');
+
+    // Verificar el token con Google
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name, picture } = payload;
+
+    console.log('✅ Token de Google verificado para:', email);
+
+    // Verificar si el usuario ya existe en la base de datos
+    const [existingUsers] = await db.promise().execute(
+      'SELECT * FROM usuarios WHERE email = ? OR google_id = ?',
+      [email, googleId]
+    );
+
+    let user;
+
+    if (existingUsers.length > 0) {
+      // Usuario existe, actualizar información de Google si es necesario
+      user = existingUsers[0];
+      console.log('🔄 Usuario existente encontrado:', user.email);
+      
+      if (!user.google_id || !user.foto) {
+        await db.promise().execute(
+          'UPDATE usuarios SET google_id = ?, foto = ? WHERE id = ?',
+          [googleId, picture, user.id]
+        );
+        user.google_id = googleId;
+        user.foto = picture;
+      }
+    } else {
+      // Crear nuevo usuario
+      console.log('👤 Creando nuevo usuario para:', email);
+      const [result] = await db.promise().execute(
+        'INSERT INTO usuarios (nombre, email, google_id, foto, password) VALUES (?, ?, ?, ?, ?)',
+        [name, email, googleId, picture, ''] // Password vacío para usuarios de Google
+      );
+
+      user = {
+        id: result.insertId,
+        nombre: name,
+        email: email,
+        google_id: googleId,
+        foto: picture
+      };
+    }
+
+    // Generar token JWT
+    const jwtToken = jwt.sign(
+      { 
+        id: user.id, 
+        email: user.email,
+        googleId: googleId 
+      },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    console.log(' Autenticación con Google exitosa para:', user.email);
+
+    res.json({
+      message: 'Autenticación con Google exitosa',
+      token: jwtToken,
+      user: {
+        id: user.id,
+        nombre: user.nombre,
+        email: user.email,
+        foto: user.foto,
+        google_id: user.google_id
+      }
+    });
+
+  } catch (error) {
+    console.error(' Error en autenticación con Google:', error);
+    res.status(500).json({ error: 'Error en autenticación con Google: ' + error.message });
   }
 });
 
@@ -169,7 +275,7 @@ app.get('/api/auth/verify', authenticateToken, (req, res) => {
 app.get('/api/auth/profile', authenticateToken, async (req, res) => {
   try {
     const [users] = await db.promise().execute(
-      'SELECT id, nombre, email, creado_en FROM usuarios WHERE id = ?',
+      'SELECT id, nombre, email, foto, creado_en FROM usuarios WHERE id = ?',
       [req.user.id]
     );
 
@@ -242,6 +348,58 @@ app.post('/api/auth/change-password', authenticateToken, async (req, res) => {
     res.json({ message: 'Contraseña cambiada correctamente' });
   } catch (error) {
     console.error('Error cambiando contraseña:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Ruta para actualizar foto de perfil
+app.put('/api/auth/profile-photo', authenticateToken, async (req, res) => {
+  try {
+    const { foto } = req.body;
+    
+    console.log('📸 Actualizando foto de perfil para usuario:', req.user.id);
+
+    await db.promise().execute(
+      'UPDATE usuarios SET foto = ? WHERE id = ?',
+      [foto, req.user.id]
+    );
+
+    // Obtener el usuario actualizado
+    const [users] = await db.promise().execute(
+      'SELECT id, nombre, email, foto, google_id FROM usuarios WHERE id = ?',
+      [req.user.id]
+    );
+
+    console.log('✅ Foto de perfil actualizada correctamente');
+
+    res.json({ 
+      message: 'Foto de perfil actualizada correctamente',
+      user: users[0]
+    });
+
+  } catch (error) {
+    console.error(' Error actualizando foto de perfil:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Ruta para obtener usuario por Google ID
+app.get('/api/auth/google/:googleId', async (req, res) => {
+  try {
+    const { googleId } = req.params;
+
+    const [users] = await db.promise().execute(
+      'SELECT id, nombre, email, foto FROM usuarios WHERE google_id = ?',
+      [googleId]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    res.json({ user: users[0] });
+  } catch (error) {
+    console.error('Error obteniendo usuario de Google:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
@@ -467,115 +625,39 @@ app.get('/api', (req, res) => {
   res.json({ message: 'API de GeoTube funcionando correctamente' });
 });
 
+// ==================== MANEJO DE RUTAS NO ENCONTRADAS ====================
+
+// Manejo de rutas no encontradas - DEBE IR AL FINAL, DESPUÉS DE TODAS LAS RUTAS
+app.use((req, res) => {
+  res.status(404).json({ 
+    error: 'Ruta no encontrada',
+    path: req.path,
+    method: req.method,
+    message: 'La ruta solicitada no existe en el servidor'
+  });
+});
+
+// Manejo de errores global
+app.use((error, req, res, next) => {
+  console.error('❌ Error global:', error);
+  res.status(500).json({ 
+    error: 'Error interno del servidor',
+    message: error.message
+  });
+});
+
 // Iniciar el servidor
 app.listen(port, () => {
-  console.log(` Servidor corriendo en http://localhost:${port}`);
-  console.log(` API disponible en http://localhost:${port}/api`);
-  console.log(` Rutas de autenticación en http://localhost:${port}/api/auth`);
-});
-
-const { OAuth2Client } = require('google-auth-library');
-
-// Configura el cliente de Google OAuth
-const GOOGLE_CLIENT_ID = '369281279205-i1b62ojhbhq6jel1oh8li22o1aklklqj.apps.googleusercontent.com';
-const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
-
-// Ruta para autenticación con Google
-app.post('/api/auth/google', async (req, res) => {
-  try {
-    const { token } = req.body;
-
-    if (!token) {
-      return res.status(400).json({ error: 'Token de Google es requerido' });
-    }
-
-    // Verificar el token con Google
-    const ticket = await googleClient.verifyIdToken({
-      idToken: token,
-      audience: GOOGLE_CLIENT_ID,
-    });
-
-    const payload = ticket.getPayload();
-    const { sub: googleId, email, name, picture } = payload;
-
-    // Verificar si el usuario ya existe en la base de datos
-    const [existingUsers] = await db.promise().execute(
-      'SELECT * FROM usuarios WHERE email = ? OR google_id = ?',
-      [email, googleId]
-    );
-
-    let user;
-
-    if (existingUsers.length > 0) {
-      // Usuario existe, actualizar información de Google si es necesario
-      user = existingUsers[0];
-      if (!user.google_id) {
-        await db.promise().execute(
-          'UPDATE usuarios SET google_id = ?, foto = ? WHERE id = ?',
-          [googleId, picture, user.id]
-        );
-      }
-    } else {
-      // Crear nuevo usuario
-      const [result] = await db.promise().execute(
-        'INSERT INTO usuarios (nombre, email, google_id, foto, password) VALUES (?, ?, ?, ?, ?)',
-        [name, email, googleId, picture, ''] // Password vacío para usuarios de Google
-      );
-
-      user = {
-        id: result.insertId,
-        nombre: name,
-        email: email,
-        google_id: googleId,
-        foto: picture
-      };
-    }
-
-    // Generar token JWT
-    const jwtToken = jwt.sign(
-      { 
-        id: user.id, 
-        email: user.email,
-        googleId: googleId 
-      },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
-    res.json({
-      message: 'Autenticación con Google exitosa',
-      token: jwtToken,
-      user: {
-        id: user.id,
-        nombre: user.nombre,
-        email: user.email,
-        foto: user.foto
-      }
-    });
-
-  } catch (error) {
-    console.error('Error en autenticación con Google:', error);
-    res.status(500).json({ error: 'Error en autenticación con Google' });
-  }
-});
-
-// Ruta para obtener usuario por Google ID
-app.get('/api/auth/google/:googleId', async (req, res) => {
-  try {
-    const { googleId } = req.params;
-
-    const [users] = await db.promise().execute(
-      'SELECT id, nombre, email, foto FROM usuarios WHERE google_id = ?',
-      [googleId]
-    );
-
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'Usuario no encontrado' });
-    }
-
-    res.json({ user: users[0] });
-  } catch (error) {
-    console.error('Error obteniendo usuario de Google:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
-  }
+  console.log(`   Servidor corriendo en http://localhost:${port}`);
+  console.log(`   API disponible en http://localhost:${port}/api`);
+  console.log(`   Rutas de autenticación en http://localhost:${port}/api/auth`);
+  console.log(`   Salud del servidor: http://localhost:${port}/api/health`);
+  console.log(`   Rutas disponibles:`);
+  console.log(`   GET  /api/health`);
+  console.log(`   POST /api/auth/register`);
+  console.log(`   POST /api/auth/login`);
+  console.log(`   POST /api/auth/google`);
+  console.log(`   PUT  /api/auth/profile-photo`);
+  console.log(`   GET  /api/search?q=ubicacion`);
+  console.log(`   GET  /api/video/:videoId`);
 });
