@@ -99,11 +99,11 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
     script.async = true;
     script.defer = true;
     script.onload = () => {
-      console.log('✅ Google Auth script cargado correctamente');
+      console.log(' Google Auth script cargado correctamente');
       setGoogleLoaded(true);
     };
     script.onerror = () => {
-      console.error('❌ Error cargando Google Auth script');
+      console.error(' Error cargando Google Auth script');
       setError('Error al cargar Google Auth');
       setGoogleLoaded(false);
     };
@@ -119,7 +119,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
     }
 
     try {
-      console.log('🚀 Inicializando Google Auth...');
+      console.log(' Inicializando Google Auth...');
       
       window.google.accounts.id.initialize({
         client_id: '369281279205-i1b62ojhbhq6jel1oh8li22o1aklklqj.apps.googleusercontent.com',
@@ -132,8 +132,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       // Lanzar el popup de Google directamente
       window.google.accounts.id.prompt((notification) => {
         if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-          // Si no se muestra automáticamente, mostrar el botón manual
-          console.log('Mostrando botón manual de Google');
+          console.log(' Mostrando botón manual de Google');
           window.google.accounts.id.renderButton(
             document.getElementById('googleButton'),
             { 
@@ -148,7 +147,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       });
 
     } catch (error) {
-      console.error('Error initializing Google Auth:', error);
+      console.error(' Error initializing Google Auth:', error);
       setError('Error al inicializar Google Auth');
     }
   };
@@ -158,7 +157,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       setLoading(true);
       setError('');
 
-      console.log('🔑 Google response received:', response);
+      console.log(' Google response received:', response);
 
       const backendResponse = await fetch('http://localhost:3001/api/auth/google', {
         method: 'POST',
@@ -168,25 +167,40 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
         body: JSON.stringify({ token: response.credential }),
       });
 
+      // Verificar si la respuesta es JSON
+      const contentType = backendResponse.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const textResponse = await backendResponse.text();
+        console.error(' El servidor devolvió HTML:', textResponse.substring(0, 200));
+        throw new Error('Error del servidor: la ruta /api/auth/google no existe');
+      }
+
       const data = await backendResponse.json();
 
       if (!backendResponse.ok) {
         throw new Error(data.error || 'Error del servidor');
       }
 
-      console.log('✅ Login exitoso con Google:', data.user);
+      console.log(' Login exitoso con Google:', data.user);
       
-      // 🔥 CORREGIDO: Guardar datos en localStorage
+      // Guardar datos en localStorage
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       
-      // 🔥 CORREGIDO: Llamar onLogin con los datos del usuario
+      // Llamar onLogin con los datos del usuario
       onLogin(data.user);
       onClose();
 
     } catch (err) {
-      console.error('❌ Google auth error:', err);
-      setError(err.message || 'Error en autenticación con Google');
+      console.error(' Google auth error:', err);
+      
+      if (err.message.includes('Failed to fetch')) {
+        setError('No se pudo conectar al servidor. Verifica que esté corriendo en localhost:3001');
+      } else if (err.message.includes('HTML')) {
+        setError('Error del servidor: la ruta /api/auth/google no existe o hay un error');
+      } else {
+        setError(err.message || 'Error en autenticación con Google');
+      }
     } finally {
       setLoading(false);
     }
@@ -197,7 +211,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
     setLoading(true);
     setError('');
 
-    //validar email
+    // Validar email
     if (!validarEmail(formData.email)) {
       setError('Email no válido');
       setLoading(false);
@@ -232,7 +246,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
         ? { email: formData.email, password: formData.password }
         : { nombre: formData.nombre, email: formData.email, password: formData.password };
 
-      console.log('📤 Enviando datos a:', endpoint, payload);
+      console.log(' Enviando datos a:', endpoint, payload);
 
       const response = await fetch(`http://localhost:3001/api/auth${endpoint}`, {
         method: 'POST',
@@ -242,19 +256,27 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
         body: JSON.stringify(payload),
       });
 
+      // Verificar si la respuesta es JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const textResponse = await response.text();
+        console.error(' El servidor devolvió HTML:', textResponse.substring(0, 200));
+        throw new Error('Error del servidor: verifica que las rutas de auth existan');
+      }
+
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(data.error);
       }
 
-      console.log('✅ Login/Register exitoso:', data.user);
+      console.log(' Login/Register exitoso:', data.user);
       
-      // 🔥 CORREGIDO: Guardar datos en localStorage
+      // Guardar datos en localStorage
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       
-      // 🔥 CORREGIDO: Llamar onLogin con los datos del usuario
+      // Llamar onLogin con los datos del usuario
       onLogin(data.user);
       onClose();
 
@@ -266,7 +288,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       setShowConfirmPassword(false);
 
     } catch (err) {
-      console.error('❌ Error en auth:', err);
+      console.error(' Error en auth:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -285,15 +307,16 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content max-w-md">
+    <div className="modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="modal-content max-w-md bg-gray-800 rounded-2xl p-6 border border-gray-700">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gradient">
+          <h2 className="text-2xl font-bold text-gradient bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
             {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl"
+            className="text-gray-400 hover:text-white text-2xl transition-colors"
+            disabled={loading}
           >
             ×
           </button>
@@ -341,48 +364,52 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
             <div>
-              <label className="block text-sm font-medium mb-2">Nombre completo</label>
+              <label className="block text-sm font-medium mb-2 text-gray-300">Nombre completo</label>
               <input
                 type="text"
                 name="nombre"
                 value={formData.nombre}
                 onChange={handleChange}
                 required
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 placeholder="Tu nombre completo"
+                disabled={loading}
               />
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium mb-2">Email</label>
+            <label className="block text-sm font-medium mb-2 text-gray-300">Email</label>
             <input
               type="email"
               name="email"
               value={formData.email}
               onChange={handleChange}
               required
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
               placeholder="tu@email.com"
+              disabled={loading}
             />
             {errorMail && <p className="text-red-500 text-sm mt-1">{errorMail}</p>}
           </div>
 
           <div className="relative">
-            <label className="block text-sm font-medium mb-2">Contraseña</label>
+            <label className="block text-sm font-medium mb-2 text-gray-300">Contraseña</label>
             <input
               type={showPassword ? "text" : "password"}
               name="password"
               value={formData.password}
               onChange={handleChange}
               required
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
               placeholder="••••••••"
+              disabled={loading}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-10 text-gray-400 hover:text-white focus:outline-none"
+              className="absolute right-3 top-10 text-gray-400 hover:text-white focus:outline-none transition-colors"
+              disabled={loading}
             >
               {showPassword ? <FaEyeSlash size={20} /> : <FaEye size={20} />}
             </button>
@@ -409,20 +436,22 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
 
           {!isLogin && (
             <div className="relative">
-              <label className="block text-sm font-medium mb-2">Confirmar contraseña</label>
+              <label className="block text-sm font-medium mb-2 text-gray-300">Confirmar contraseña</label>
               <input
                 type={showConfirmPassword ? "text" : "password"}
                 name="confirmPassword"
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 required
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 placeholder="••••••••"
+                disabled={loading}
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3 top-10 text-gray-400 hover:text-white focus:outline-none"
+                className="absolute right-3 top-10 text-gray-400 hover:text-white focus:outline-none transition-colors"
+                disabled={loading}
               >
                 {showConfirmPassword ? <FaEyeSlash size={20} /> : <FaEye size={20} />}
               </button>
@@ -433,7 +462,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full btn-primary py-3 text-lg font-semibold"
+            className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105"
           >
             {loading ? 'Cargando...' : (isLogin ? 'Iniciar Sesión' : 'Crear Cuenta')}
           </button>
@@ -444,7 +473,8 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
             {isLogin ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?'}
             <button
               onClick={switchMode}
-              className="ml-2 text-blue-400 hover:text-blue-300 font-semibold"
+              className="ml-2 text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+              disabled={loading}
             >
               {isLogin ? 'Regístrate aquí' : 'Inicia sesión aquí'}
             </button>

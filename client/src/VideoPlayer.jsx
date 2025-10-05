@@ -20,7 +20,7 @@ const VideoPlayer = () => {
   });
 
   const MAPBOX_TOKEN = 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
-  const YOUTUBE_API_KEY = 'AIzaSyCi_KpytxXFwg6wCQKTYoCiVffiFRoGlsQ';
+  const YOUTUBE_API_KEY = 'AIzaSyAmkc92taptBHHwQsQdOJiGW7Wktghl-OI';
 
   // 🔥 NUEVO: Verificar autenticación al cargar el componente
   useEffect(() => {

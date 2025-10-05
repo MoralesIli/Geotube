@@ -36,77 +36,71 @@ const MainApp = () => {
   const navigate = useNavigate();
 
   const MAPBOX_TOKEN = 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
-  const YOUTUBE_API_KEY = 'AIzaSyCi_KpytxXFwg6wCQKTYoCiVffiFRoGlsQ';
+  const YOUTUBE_API_KEY = 'AIzaSyAmkc92taptBHHwQsQdOJiGW7Wktghl-OI';
 
-  // 🔥 NUEVO: Verificar autenticación al cargar el componente
+  //  Verificar autenticación al cargar el componente
   useEffect(() => {
     const checkAuthStatus = () => {
       const token = localStorage.getItem('token');
       const userData = localStorage.getItem('user');
       
-      console.log('🔍 Verificando autenticación...');
-      console.log('Token en localStorage:', token ? 'Presente' : 'Ausente');
-      console.log('User data en localStorage:', userData);
-      
       if (token && userData) {
         try {
           const user = JSON.parse(userData);
-          console.log('✅ Usuario autenticado recuperado:', user);
           setUser(user);
-          setShowProfile(true);
         } catch (error) {
-          console.error('❌ Error parsing user data:', error);
+          console.error('Error parsing user data:', error);
           localStorage.removeItem('token');
           localStorage.removeItem('user');
         }
-      } else {
-        console.log('⚠️ No hay usuario autenticado');
       }
     };
 
     checkAuthStatus();
   }, []);
 
-  // Animación del mapa corregida
+  //  Animación del mapa optimizada
   useEffect(() => {
-    if (targetViewport) {
-      startViewportRef.current = viewport;
-      setIsAnimating(true);
+    if (!targetViewport) return;
 
-      const startTime = performance.now();
-      const duration = 1000;
+    startViewportRef.current = viewport;
+    setIsAnimating(true);
 
-      const animateMap = (currentTime) => {
-        const elapsed = currentTime - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        const easedProgress = progress * (2 - progress);
+    const startTime = performance.now();
+    const duration = 1000;
 
-        const start = startViewportRef.current;
-        const end = targetViewport;
+    const animateMap = (currentTime) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easedProgress = progress * (2 - progress);
 
-        setViewport({
-          latitude: start.latitude + (end.latitude - start.latitude) * easedProgress,
-          longitude: start.longitude + (end.longitude - start.longitude) * easedProgress,
-          zoom: start.zoom + (end.zoom - start.zoom) * easedProgress,
-        });
+      const start = startViewportRef.current;
+      const end = targetViewport;
 
-        if (progress < 1) {
-          animationRef.current = requestAnimationFrame(animateMap);
-        } else {
-          setIsAnimating(false);
-          setTargetViewport(null);
-        }
-      };
+      setViewport({
+        latitude: start.latitude + (end.latitude - start.latitude) * easedProgress,
+        longitude: start.longitude + (end.longitude - start.longitude) * easedProgress,
+        zoom: start.zoom + (end.zoom - start.zoom) * easedProgress,
+      });
 
-      animationRef.current = requestAnimationFrame(animateMap);
-    }
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animateMap);
+      } else {
+        setIsAnimating(false);
+        setTargetViewport(null);
+      }
+    };
+
+    animationRef.current = requestAnimationFrame(animateMap);
 
     return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
     };
   }, [targetViewport]);
 
-  // 🔥 MEJORADO: Función para obtener coordenadas de un lugar
+  //  Funciones optimizadas para geocoding
   const getLocationCoordinates = useCallback(async (placeName) => {
     try {
       const response = await fetch(
@@ -130,7 +124,6 @@ const MainApp = () => {
     }
   }, [MAPBOX_TOKEN]);
 
-  // 🔥 OPTIMIZADO: Función para obtener nombre de ubicación más rápida
   const getLocationName = useCallback(async (lat, lng) => {
     try {
       const response = await fetch(
@@ -152,16 +145,11 @@ const MainApp = () => {
     }
   }, [MAPBOX_TOKEN]);
 
-  // 🔥 MEJORADO: Función para buscar videos de YouTube con ubicación correcta
+  //  Función optimizada para buscar videos de YouTube
   const searchYouTubeVideosByLocation = useCallback(async (latitude, longitude, locationName, query = '', pageToken = '') => {
     try {
       const searchQuery = query || locationName.split(',')[0].trim();
-
-      console.log('Buscando videos para:', searchQuery, 'en:', locationName);
-
-      let url = `https://www.googleapis.com/youtube/v3/search?` +
-        `part=snippet&type=video&maxResults=12&relevanceLanguage=es&` +
-        `q=${encodeURIComponent(searchQuery)}&key=${YOUTUBE_API_KEY}`;
+      let url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=12&relevanceLanguage=es&q=${encodeURIComponent(searchQuery)}&key=${YOUTUBE_API_KEY}`;
 
       if (pageToken) {
         url += `&pageToken=${pageToken}`;
@@ -170,81 +158,77 @@ const MainApp = () => {
       const searchResponse = await fetch(url);
 
       if (!searchResponse.ok) {
-        if (searchResponse.status === 403) {
-          throw new Error('QUOTA_EXCEEDED');
-        }
-        const errorData = await searchResponse.json();
-        throw new Error(`YouTube API: ${errorData.error?.message || 'Unknown error'}`);
+        if (searchResponse.status === 403) throw new Error('QUOTA_EXCEEDED');
+        throw new Error('Error en YouTube API');
       }
 
       const searchData = await searchResponse.json();
       
-      if (searchData.items?.length > 0) {
-        const videoIds = searchData.items.slice(0, 8).map(item => item.id.videoId).join(',');
-
-        let videoStats = {};
-        try {
-          const statsResponse = await fetch(
-            `https://www.googleapis.com/youtube/v3/videos?` +
-            `part=statistics,contentDetails&id=${videoIds}&key=${YOUTUBE_API_KEY}`
-          );
-
-          if (statsResponse.ok) {
-            const statsData = await statsResponse.json();
-            statsData.items.forEach(video => {
-              videoStats[video.id] = {
-                viewCount: parseInt(video.statistics.viewCount) || Math.floor(Math.random() * 50000) + 1000,
-                likeCount: parseInt(video.statistics.likeCount) || 0,
-                duration: video.contentDetails?.duration || 'PT0S'
-              };
-            });
-          }
-        } catch (statsError) {
-          console.warn('Error obteniendo estadísticas');
-        }
-
-        const youtubeVideos = searchData.items.slice(0, 12).map((item) => {
-          const videoId = item.id.videoId;
-          const stats = videoStats[videoId] || { 
-            viewCount: Math.floor(Math.random() * 50000) + 1000,
-            likeCount: 0,
-            duration: 'PT0S'
-          };
-          
-          // 🔥 MEJORADO: Distribuir videos alrededor de la ubicación real
-          const randomOffset = () => (Math.random() - 0.5) * 0.5; // Radio más amplio
-          const angle = Math.random() * 2 * Math.PI;
-          const distance = Math.random() * 0.3; // Hasta 30km de distancia
-          
-          const newLat = latitude + (distance * Math.cos(angle));
-          const newLng = longitude + (distance * Math.sin(angle));
-          
-          return {
-            youtube_video_id: videoId,
-            location_name: `${locationName} - ${item.snippet.channelTitle}`,
-            title: item.snippet.title,
-            channelTitle: item.snippet.channelTitle,
-            latitude: newLat,
-            longitude: newLng,
-            views: stats.viewCount,
-            likes: stats.likeCount,
-            duration: stats.duration,
-            isCurrentLocation: false,
-            isSearchResult: true,
-            thumbnail: item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default?.url,
-            publishedAt: item.snippet.publishedAt,
-            description: item.snippet.description
-          };
-        });
-
-        console.log(`Encontrados ${youtubeVideos.length} videos para ${searchQuery}`);
-        return {
-          videos: youtubeVideos,
-          nextPageToken: searchData.nextPageToken || ''
-        };
+      if (!searchData.items?.length) {
+        return { videos: [], nextPageToken: '' };
       }
-      
-      return { videos: [], nextPageToken: '' };
+
+      // Obtener estadísticas de videos
+      const videoIds = searchData.items.slice(0, 8).map(item => item.id.videoId).join(',');
+      let videoStats = {};
+
+      try {
+        const statsResponse = await fetch(
+          `https://www.googleapis.com/youtube/v3/videos?part=statistics,contentDetails&id=${videoIds}&key=${YOUTUBE_API_KEY}`
+        );
+
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json();
+          statsData.items.forEach(video => {
+            videoStats[video.id] = {
+              viewCount: parseInt(video.statistics.viewCount) || Math.floor(Math.random() * 50000) + 1000,
+              likeCount: parseInt(video.statistics.likeCount) || 0,
+              duration: video.contentDetails?.duration || 'PT0S'
+            };
+          });
+        }
+      } catch (statsError) {
+        console.warn('Error obteniendo estadísticas');
+      }
+
+      // Crear array de videos
+      const youtubeVideos = searchData.items.slice(0, 12).map((item) => {
+        const videoId = item.id.videoId;
+        const stats = videoStats[videoId] || { 
+          viewCount: Math.floor(Math.random() * 50000) + 1000,
+          likeCount: 0,
+          duration: 'PT0S'
+        };
+        
+        // Distribuir videos alrededor de la ubicación
+        const angle = Math.random() * 2 * Math.PI;
+        const distance = Math.random() * 0.3;
+        const newLat = latitude + (distance * Math.cos(angle));
+        const newLng = longitude + (distance * Math.sin(angle));
+        
+        return {
+          youtube_video_id: videoId,
+          location_name: `${locationName} - ${item.snippet.channelTitle}`,
+          title: item.snippet.title,
+          channelTitle: item.snippet.channelTitle,
+          latitude: newLat,
+          longitude: newLng,
+          views: stats.viewCount,
+          likes: stats.likeCount,
+          duration: stats.duration,
+          isCurrentLocation: false,
+          isSearchResult: true,
+          thumbnail: item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default?.url,
+          publishedAt: item.snippet.publishedAt,
+          description: item.snippet.description
+        };
+      });
+
+      return {
+        videos: youtubeVideos,
+        nextPageToken: searchData.nextPageToken || ''
+      };
+
     } catch (error) {
       console.error('Error buscando videos:', error);
       if (error.message === 'QUOTA_EXCEEDED') throw error;
@@ -252,26 +236,20 @@ const MainApp = () => {
     }
   }, [YOUTUBE_API_KEY]);
 
-  // Función para cargar videos populares de México
+  //  Videos populares de México con fallback
   const fetchPopularMexicoVideos = useCallback(async () => {
     try {
-      console.log('Cargando videos populares de México...');
-      
       const lastQuotaError = localStorage.getItem('youtube_quota_exceeded');
       if (lastQuotaError && Date.now() - parseInt(lastQuotaError) < 3600000) {
         throw new Error('QUOTA_EXCEEDED_RECENTLY');
       }
 
       const response = await fetch(
-        `https://www.googleapis.com/youtube/v3/videos?` +
-        `part=snippet,statistics,contentDetails&chart=mostPopular&` +
-        `regionCode=MX&maxResults=12&key=${YOUTUBE_API_KEY}`
+        `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&chart=mostPopular&regionCode=MX&maxResults=12&key=${YOUTUBE_API_KEY}`
       );
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Videos populares encontrados:', data.items?.length || 0);
-        
         const popularVideos = data.items.map((item) => ({
           youtube_video_id: item.id,
           location_name: `México - ${item.snippet.channelTitle}`,
@@ -301,7 +279,6 @@ const MainApp = () => {
       }
     } catch (error) {
       console.error('Error:', error);
-      
       // Fallback con videos hardcodeados
       const fallbackVideos = [
         {
@@ -317,20 +294,6 @@ const MainApp = () => {
           isCurrentLocation: false,
           isSearchResult: false,
           thumbnail: 'https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg'
-        },
-        {
-          youtube_video_id: '9bZkp7q19f0',
-          location_name: 'México - Video Viral',
-          title: 'Video Viral Internacional',
-          channelTitle: 'Canal Viral',
-          latitude: 20.6597,
-          longitude: -103.3496,
-          views: 2500000,
-          likes: 75000,
-          duration: 'PT4M12S',
-          isCurrentLocation: false,
-          isSearchResult: false,
-          thumbnail: 'https://img.youtube.com/vi/9bZkp7q19f0/mqdefault.jpg'
         }
       ];
       setVideos(fallbackVideos);
@@ -340,7 +303,7 @@ const MainApp = () => {
     }
   }, [YOUTUBE_API_KEY]);
 
-  // 🔥 MEJORADO: Cargar videos para ubicación específica
+  //  Cargar videos para ubicación específica
   const loadVideosForLocation = useCallback(async (latitude, longitude, locationName, isSearch = false) => {
     setLoadingVideos(true);
     
@@ -363,7 +326,7 @@ const MainApp = () => {
     }
   }, [searchYouTubeVideosByLocation, fetchPopularMexicoVideos]);
 
-  // 🔥 NUEVO: Función para cargar más videos (paginación)
+  //  Cargar más videos (paginación)
   const loadMoreVideos = useCallback(async () => {
     if (!nextPageToken) return;
 
@@ -372,7 +335,6 @@ const MainApp = () => {
       let result;
       
       if (activeFilter === 'search' && searchLocation) {
-        // Cargar más videos de búsqueda
         result = await searchYouTubeVideosByLocation(
           searchLocation.latitude, 
           searchLocation.longitude, 
@@ -381,7 +343,6 @@ const MainApp = () => {
           nextPageToken
         );
       } else if (userLocation && activeFilter === 'current') {
-        // Cargar más videos de ubicación actual
         result = await searchYouTubeVideosByLocation(
           userLocation.latitude,
           userLocation.longitude,
@@ -399,21 +360,17 @@ const MainApp = () => {
       }
     } catch (error) {
       console.error('Error cargando más videos:', error);
-      alert('Error al cargar más videos');
     } finally {
       setLoadingVideos(false);
     }
   }, [nextPageToken, activeFilter, searchLocation, userLocation, userLocationName, searchTerm, searchYouTubeVideosByLocation]);
 
-  // 🔥 MEJORADO: Búsqueda de videos por término con ubicación correcta
+  //  Búsqueda de videos por término
   const fetchVideos = useCallback(async (query, pageToken = '') => {
     setLoadingVideos(true);
     try {
-      // Primero obtener coordenadas del lugar buscado
       const locationData = await getLocationCoordinates(query);
       
-      console.log('Coordenadas encontradas para', query, ':', locationData);
-
       // Mover el mapa a la ubicación buscada
       setTargetViewport({ 
         latitude: locationData.latitude, 
@@ -432,10 +389,8 @@ const MainApp = () => {
 
       if (result.videos.length > 0) {
         if (pageToken) {
-          // Si es paginación, agregar a los existentes
           setVideos(prev => [...prev, ...result.videos]);
         } else {
-          // Si es nueva búsqueda, reemplazar
           setVideos(result.videos);
         }
         
@@ -455,11 +410,9 @@ const MainApp = () => {
       
       if (error.message.includes('Lugar no encontrado')) {
         alert('No se pudo encontrar el lugar especificado. Intenta con un nombre más específico.');
-      } else {
-        alert('Error al buscar videos: ' + error.message);
       }
       
-      // Fallback a búsqueda simple sin ubicación
+      // Fallback a búsqueda simple
       try {
         const fallbackResult = await searchYouTubeVideosByLocation(
           23.6345, -102.5528, 'México', query
@@ -475,8 +428,8 @@ const MainApp = () => {
     }
   }, [getLocationCoordinates, searchYouTubeVideosByLocation]);
 
-  // 🔥 CORREGIDO: Función para obtener ubicación del usuario
-  const getUserLocation = useCallback(async (recenter = true) => {
+  //  Obtener ubicación del usuario
+  const getUserLocation = useCallback(async () => {
     if (!navigator.geolocation) {
       alert('La geolocalización no es compatible con este navegador.');
       return fetchPopularMexicoVideos();
@@ -485,27 +438,20 @@ const MainApp = () => {
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
-        console.log('Ubicación obtenida:', latitude, longitude);
         
-        // 🔥 MOVER EL MAPA CON ANIMACIÓN
         setTargetViewport({ 
           latitude: latitude, 
           longitude: longitude, 
           zoom: 12 
         });
         
-        // 🔥 ACTUALIZAR ESTADOS DE UBICACIÓN
         setUserLocation({ latitude, longitude });
 
         try {
-          // 🔥 CORREGIDO: Obtener nombre de ubicación y cargar videos
           const locationName = await getLocationName(latitude, longitude);
           setUserLocationName(locationName);
-          
-          // Cargar videos para esta ubicación
           await loadVideosForLocation(latitude, longitude, locationName);
 
-          // Guardar en localStorage
           localStorage.setItem('userLocation', JSON.stringify({ 
             latitude, 
             longitude,
@@ -531,7 +477,7 @@ const MainApp = () => {
     );
   }, [getLocationName, loadVideosForLocation, fetchPopularMexicoVideos]);
 
-  // Videos populares basados en ubicación
+  //  Videos populares basados en ubicación
   const fetchPopularVideos = useCallback(async () => {
     if (!userLocation) {
       alert('Primero activa tu ubicación usando el botón "Mi Ubicación"');
@@ -552,7 +498,7 @@ const MainApp = () => {
     }
   }, [userLocation, userLocationName, getLocationName, loadVideosForLocation]);
 
-  // Otros videos relacionados
+  //  Otros videos relacionados
   const fetchOtherVideos = useCallback(async () => {
     if (!userLocation) {
       alert('Primero activa tu ubicación usando el botón "Mi Ubicación"');
@@ -581,7 +527,7 @@ const MainApp = () => {
     }
   }, [userLocation, userLocationName, getLocationName, searchYouTubeVideosByLocation, loadVideosForLocation]);
 
-  // Inicialización de la app
+  //  Inicialización de la app
   useEffect(() => {
     const initializeApp = async () => {
       const savedLocation = localStorage.getItem('userLocation');
@@ -603,11 +549,8 @@ const MainApp = () => {
     initializeApp();
   }, [loadVideosForLocation, fetchPopularMexicoVideos]);
 
-  // 🔥 CORREGIDO: Handlers de autenticación
+  //  Handlers de autenticación
   const handleLogin = (userData) => {
-    console.log('✅ Login exitoso:', userData);
-    
-    // Asegurarse de que los datos se guarden en localStorage
     if (userData && !localStorage.getItem('user')) {
       localStorage.setItem('user', JSON.stringify(userData));
     }
@@ -618,21 +561,20 @@ const MainApp = () => {
   };
 
   const handleLogout = () => {
-    console.log('🔒 Cerrando sesión...');
-    
-    // Limpiar todo del localStorage
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    
-    // Resetear estado
     setUser(null);
     setShowProfile(false);
     setShowSettings(false);
-    
-    console.log('✅ Sesión cerrada correctamente');
   };
 
-  // Handlers de videos
+  //  Actualizar foto de perfil
+  const handlePhotoUpdate = (updatedUser) => {
+    setUser(updatedUser);
+    setShowProfile(false);
+  };
+
+  //  Handlers de videos
   const handleVideoClick = (video) => {
     setSelectedVideo(video);
   };
@@ -660,7 +602,7 @@ const MainApp = () => {
     }
   };
 
-  // Títulos del sidebar
+  //  Títulos del sidebar optimizados
   const getSidebarTitle = () => {
     const titles = {
       popular: 'Videos Populares',
@@ -683,7 +625,7 @@ const MainApp = () => {
     return subtitles[activeFilter] || 'Explorando contenido local';
   };
 
-  // Formatear duración del video
+  //  Formatear duración del video
   const formatDuration = (duration) => {
     const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
     const hours = (match[1] || '').replace('H', '');
@@ -694,10 +636,6 @@ const MainApp = () => {
       ? `${hours}:${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}`
       : `${minutes}:${seconds.padStart(2, '0')}`;
   };
-
-  // 🔥 NUEVO: Debug info
-  console.log('🔄 MainApp - Estado user:', user);
-  console.log('🔄 MainApp - localStorage user:', localStorage.getItem('user'));
 
   return (
     <div className="flex h-screen w-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 text-white overflow-hidden">
@@ -714,7 +652,7 @@ const MainApp = () => {
               placeholder="Buscar ciudades, lugares..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="search-input glass-effect bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              className="search-input glass-effect bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 w-80"
             />
             <button type="submit" className="ml-4 btn-primary bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 px-4 py-2 rounded-lg transition-all duration-300">
               Buscar
@@ -740,20 +678,45 @@ const MainApp = () => {
               <div className="relative">
                 <button 
                   onClick={() => setShowProfile(!showProfile)}
-                  className="user-avatar text-lg w-10 h-10 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold"
+                  className="user-avatar text-lg w-10 h-10 rounded-full flex items-center justify-center text-white font-bold overflow-hidden border-2 border-cyan-500"
                   title={user.nombre}
                 >
-                  {user.nombre.charAt(0).toUpperCase()}
+                  {user.foto ? (
+                    <img 
+                      src={user.foto} 
+                      alt="Foto de perfil" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-r from-cyan-500 to-blue-500 flex items-center justify-center">
+                      {user.nombre.charAt(0).toUpperCase()}
+                    </div>
+                  )}
                 </button>
                 
                 {showProfile && (
                   <div className="absolute right-0 top-16 w-64 glass-effect bg-gray-800 rounded-2xl shadow-2xl z-50 border border-gray-700">
                     <div className="p-6 border-b border-white/10">
-                      <p className="font-bold text-cyan-400">{user.nombre}</p>
-                      <p className="text-sm text-gray-300">{user.email}</p>
-                      {user.google_id && (
-                        <p className="text-xs text-green-400 mt-1">Cuenta Google</p>
-                      )}
+                      <div className="flex items-center gap-3 mb-3">
+                        {user.foto ? (
+                          <img 
+                            src={user.foto} 
+                            alt="Foto de perfil" 
+                            className="w-12 h-12 rounded-full object-cover border-2 border-cyan-500"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold">
+                            {user.nombre.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-bold text-cyan-400">{user.nombre}</p>
+                          <p className="text-sm text-gray-300">{user.email}</p>
+                          {user.google_id && (
+                            <p className="text-xs text-green-400 mt-1">Cuenta Google</p>
+                          )}
+                        </div>
+                      </div>
                     </div>
                     <div className="p-4">
                       <button 
@@ -761,8 +724,9 @@ const MainApp = () => {
                           setShowProfile(false);
                           setShowPhotoModal(true);
                         }}
-                        className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 transition"
+                        className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 transition flex items-center gap-2"
                       >
+                        <span>📷</span>
                         Cambiar Foto de Perfil
                       </button>
                       
@@ -772,16 +736,18 @@ const MainApp = () => {
                             setShowProfile(false);
                             setShowPasswordModal(true);
                           }}
-                          className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 transition"
+                          className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 transition flex items-center gap-2"
                         >
+                          <span>🔒</span>
                           Cambiar Contraseña
                         </button>
                       )}
                       
                       <button 
                         onClick={handleLogout}
-                        className="w-full text-left px-4 py-3 rounded-xl hover:bg-red-500/20 text-red-400 transition"
+                        className="w-full text-left px-4 py-3 rounded-xl hover:bg-red-500/20 text-red-400 transition flex items-center gap-2"
                       >
+                        <span>🚪</span>
                         Cerrar Sesión
                       </button>
                     </div>
@@ -817,15 +783,16 @@ const MainApp = () => {
         isOpen={showPhotoModal}
         onClose={() => setShowPhotoModal(false)}
         user={user}
+        onPhotoUpdate={handlePhotoUpdate}
       />
 
-      {/* Modal de Ajustes */}
+      {/* Modal de Ajustes Simplificado */}
       {showSettings && (
         <div className="modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="modal-content max-w-2xl bg-gray-800 rounded-2xl p-6 border border-gray-700">
+          <div className="modal-content max-w-md bg-gray-800 rounded-2xl p-6 border border-gray-700">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-gradient bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
-                Ajustes y Configuración
+                Ajustes
               </h2>
               <button 
                 onClick={() => setShowSettings(false)}
@@ -837,57 +804,22 @@ const MainApp = () => {
 
             <div className="space-y-6">
               <div className="glass-effect bg-gray-700/50 rounded-xl p-4">
-                <h3 className="text-lg font-semibold mb-3">Configuración de la Aplicación</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-3">
-                    <span>Modo Oscuro</span>
-                    <input type="checkbox" className="toggle" defaultChecked />
-                  </div>
-                  <div className="flex justify-between items-center p-3">
-                    <span>Reproducción Automática</span>
-                    <input type="checkbox" className="toggle" />
-                  </div>
-                  <div className="flex justify-between items-center p-3">
-                    <span>Calidad de Video</span>
-                    <select className="bg-gray-700 text-white px-3 py-1 rounded">
-                      <option>Alta</option>
-                      <option>Media</option>
-                      <option>Baja</option>
-                    </select>
-                  </div>
-                  <div className="flex justify-between items-center p-3">
-                    <span>Notificaciones</span>
-                    <input type="checkbox" className="toggle" defaultChecked />
-                  </div>
-                </div>
-              </div>
-
-              <div className="glass-effect bg-gray-700/50 rounded-xl p-4">
                 <h3 className="text-lg font-semibold mb-3">Historial</h3>
                 <div className="space-y-3">
                   <button className="w-full text-left p-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition">
                     Ver Historial de Videos Vistos
                   </button>
                   <button className="w-full text-left p-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition">
-                    Ver Historial de Búsquedas
-                  </button>
-                  <button className="w-full text-left p-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition">
                     Limpiar Historial Completo
-                  </button>
-                  <button className="w-full text-left p-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition">
-                    Descargar Mis Datos
                   </button>
                 </div>
               </div>
 
               <div className="glass-effect bg-gray-700/50 rounded-xl p-4">
-                <h3 className="text-lg font-semibold mb-3">Privacidad y Seguridad</h3>
+                <h3 className="text-lg font-semibold mb-3">Datos</h3>
                 <div className="space-y-3">
                   <button className="w-full text-left p-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition">
-                    Configuración de Privacidad
-                  </button>
-                  <button className="w-full text-left p-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition">
-                    Gestionar Dispositivos Conectados
+                    Descargar Mis Datos
                   </button>
                   <button className="w-full text-left p-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition">
                     Exportar Datos de la Cuenta
@@ -955,7 +887,7 @@ const MainApp = () => {
           </Map>
 
           <button
-            onClick={() => getUserLocation(true)}
+            onClick={getUserLocation}
             disabled={isAnimating}
             className="absolute bottom-6 right-6 btn-success bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white text-lg font-bold px-6 py-3 rounded-2xl shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
           >
@@ -1102,7 +1034,6 @@ const MainApp = () => {
                   </div>
                 ))}
                 
-                {/* 🔥 BOTÓN "MOSTRAR MÁS VIDEOS" */}
                 {nextPageToken && (
                   <div className="text-center mt-6">
                     <button
