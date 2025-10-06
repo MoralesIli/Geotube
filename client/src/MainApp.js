@@ -35,10 +35,27 @@ const MainApp = () => {
   const [searchLocation, setSearchLocation] = useState(null);
   const navigate = useNavigate();
 
-  const MAPBOX_TOKEN = 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
-  const YOUTUBE_API_KEY = 'AIzaSyAmkc92taptBHHwQsQdOJiGW7Wktghl-OI';
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const searchInputRef = useRef(null);
 
-  //  Verificar autenticación al cargar el componente
+  const MAPBOX_TOKEN = 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
+  const YOUTUBE_API_KEY = 'AIzaSyCi_KpytxXFwg6wCQKTYoCiVffiFRoGlsQ';
+
+  const popularSuggestions = [
+    'Ciudad de México',
+    'Cancún',
+    'Guadalajara',
+    'Monterrey',
+    'Playa del Carmen',
+    'Tulum',
+    'Oaxaca',
+    'Puerto Vallarta',
+    'Los Cabos',
+    'Mazatlán'
+  ];
+
   useEffect(() => {
     const checkAuthStatus = () => {
       const token = localStorage.getItem('token');
@@ -49,7 +66,6 @@ const MainApp = () => {
           const user = JSON.parse(userData);
           setUser(user);
         } catch (error) {
-          console.error('Error parsing user data:', error);
           localStorage.removeItem('token');
           localStorage.removeItem('user');
         }
@@ -59,7 +75,6 @@ const MainApp = () => {
     checkAuthStatus();
   }, []);
 
-  //  Animación del mapa optimizada
   useEffect(() => {
     if (!targetViewport) return;
 
@@ -100,7 +115,6 @@ const MainApp = () => {
     };
   }, [targetViewport]);
 
-  //  Funciones optimizadas para geocoding
   const getLocationCoordinates = useCallback(async (placeName) => {
     try {
       const response = await fetch(
@@ -145,7 +159,6 @@ const MainApp = () => {
     }
   }, [MAPBOX_TOKEN]);
 
-  //  Función optimizada para buscar videos de YouTube
   const searchYouTubeVideosByLocation = useCallback(async (latitude, longitude, locationName, query = '', pageToken = '') => {
     try {
       const searchQuery = query || locationName.split(',')[0].trim();
@@ -168,7 +181,6 @@ const MainApp = () => {
         return { videos: [], nextPageToken: '' };
       }
 
-      // Obtener estadísticas de videos
       const videoIds = searchData.items.slice(0, 8).map(item => item.id.videoId).join(',');
       let videoStats = {};
 
@@ -191,7 +203,6 @@ const MainApp = () => {
         console.warn('Error obteniendo estadísticas');
       }
 
-      // Crear array de videos
       const youtubeVideos = searchData.items.slice(0, 12).map((item) => {
         const videoId = item.id.videoId;
         const stats = videoStats[videoId] || { 
@@ -200,7 +211,6 @@ const MainApp = () => {
           duration: 'PT0S'
         };
         
-        // Distribuir videos alrededor de la ubicación
         const angle = Math.random() * 2 * Math.PI;
         const distance = Math.random() * 0.3;
         const newLat = latitude + (distance * Math.cos(angle));
@@ -236,7 +246,6 @@ const MainApp = () => {
     }
   }, [YOUTUBE_API_KEY]);
 
-  //  Videos populares de México con fallback
   const fetchPopularMexicoVideos = useCallback(async () => {
     try {
       const lastQuotaError = localStorage.getItem('youtube_quota_exceeded');
@@ -279,7 +288,6 @@ const MainApp = () => {
       }
     } catch (error) {
       console.error('Error:', error);
-      // Fallback con videos hardcodeados
       const fallbackVideos = [
         {
           youtube_video_id: 'dQw4w9WgXcQ',
@@ -303,7 +311,6 @@ const MainApp = () => {
     }
   }, [YOUTUBE_API_KEY]);
 
-  //  Cargar videos para ubicación específica
   const loadVideosForLocation = useCallback(async (latitude, longitude, locationName, isSearch = false) => {
     setLoadingVideos(true);
     
@@ -326,7 +333,6 @@ const MainApp = () => {
     }
   }, [searchYouTubeVideosByLocation, fetchPopularMexicoVideos]);
 
-  //  Cargar más videos (paginación)
   const loadMoreVideos = useCallback(async () => {
     if (!nextPageToken) return;
 
@@ -365,20 +371,17 @@ const MainApp = () => {
     }
   }, [nextPageToken, activeFilter, searchLocation, userLocation, userLocationName, searchTerm, searchYouTubeVideosByLocation]);
 
-  //  Búsqueda de videos por término
   const fetchVideos = useCallback(async (query, pageToken = '') => {
     setLoadingVideos(true);
     try {
       const locationData = await getLocationCoordinates(query);
       
-      // Mover el mapa a la ubicación buscada
       setTargetViewport({ 
         latitude: locationData.latitude, 
         longitude: locationData.longitude, 
         zoom: 10 
       });
 
-      // Buscar videos para esa ubicación
       const result = await searchYouTubeVideosByLocation(
         locationData.latitude,
         locationData.longitude,
@@ -412,7 +415,6 @@ const MainApp = () => {
         alert('No se pudo encontrar el lugar especificado. Intenta con un nombre más específico.');
       }
       
-      // Fallback a búsqueda simple
       try {
         const fallbackResult = await searchYouTubeVideosByLocation(
           23.6345, -102.5528, 'México', query
@@ -428,7 +430,6 @@ const MainApp = () => {
     }
   }, [getLocationCoordinates, searchYouTubeVideosByLocation]);
 
-  //  Obtener ubicación del usuario
   const getUserLocation = useCallback(async () => {
     if (!navigator.geolocation) {
       alert('La geolocalización no es compatible con este navegador.');
@@ -477,7 +478,6 @@ const MainApp = () => {
     );
   }, [getLocationName, loadVideosForLocation, fetchPopularMexicoVideos]);
 
-  //  Videos populares basados en ubicación
   const fetchPopularVideos = useCallback(async () => {
     if (!userLocation) {
       alert('Primero activa tu ubicación usando el botón "Mi Ubicación"');
@@ -498,7 +498,6 @@ const MainApp = () => {
     }
   }, [userLocation, userLocationName, getLocationName, loadVideosForLocation]);
 
-  //  Otros videos relacionados
   const fetchOtherVideos = useCallback(async () => {
     if (!userLocation) {
       alert('Primero activa tu ubicación usando el botón "Mi Ubicación"');
@@ -527,7 +526,6 @@ const MainApp = () => {
     }
   }, [userLocation, userLocationName, getLocationName, searchYouTubeVideosByLocation, loadVideosForLocation]);
 
-  //  Inicialización de la app
   useEffect(() => {
     const initializeApp = async () => {
       const savedLocation = localStorage.getItem('userLocation');
@@ -549,7 +547,74 @@ const MainApp = () => {
     initializeApp();
   }, [loadVideosForLocation, fetchPopularMexicoVideos]);
 
-  //  Handlers de autenticación
+  const fetchSuggestions = useCallback(async (query) => {
+    if (!query || query.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    setLoadingSuggestions(true);
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
+        `access_token=${MAPBOX_TOKEN}&` +
+        `country=mx&` +
+        `types=place,locality,region,neighborhood&` +
+        `language=es&` +
+        `limit=5`
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const suggestionsData = data.features.map(feature => ({
+          id: feature.id,
+          name: feature.place_name,
+          center: feature.center
+        }));
+        setSuggestions(suggestionsData);
+        setShowSuggestions(true);
+      }
+    } catch (error) {
+      console.error('Error obteniendo sugerencias:', error);
+      setSuggestions([]);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  }, [MAPBOX_TOKEN]);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      if (searchTerm) {
+        fetchSuggestions(searchTerm);
+      } else {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm, fetchSuggestions]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchInputRef.current && !searchInputRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleSuggestionClick = (suggestion) => {
+    setSearchTerm(suggestion.name);
+    setShowSuggestions(false);
+    fetchVideos(suggestion.name);
+  };
+
   const handleLogin = (userData) => {
     if (userData && !localStorage.getItem('user')) {
       localStorage.setItem('user', JSON.stringify(userData));
@@ -568,13 +633,11 @@ const MainApp = () => {
     setShowSettings(false);
   };
 
-  //  Actualizar foto de perfil
   const handlePhotoUpdate = (updatedUser) => {
     setUser(updatedUser);
     setShowProfile(false);
   };
 
-  //  Handlers de videos
   const handleVideoClick = (video) => {
     setSelectedVideo(video);
   };
@@ -597,12 +660,16 @@ const MainApp = () => {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
+    setShowSuggestions(false);
     if (searchTerm.trim()) {
       fetchVideos(searchTerm);
     }
   };
 
-  //  Títulos del sidebar optimizados
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
   const getSidebarTitle = () => {
     const titles = {
       popular: 'Videos Populares',
@@ -625,7 +692,6 @@ const MainApp = () => {
     return subtitles[activeFilter] || 'Explorando contenido local';
   };
 
-  //  Formatear duración del video
   const formatDuration = (duration) => {
     const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
     const hours = (match[1] || '').replace('H', '');
@@ -639,22 +705,85 @@ const MainApp = () => {
 
   return (
     <div className="flex h-screen w-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 text-white overflow-hidden">
-      {/* Barra superior */}
       <div className="navbar absolute top-0 left-0 w-full h-20 flex items-center justify-between px-8 z-50">
         <div className="flex items-center gap-8">
           <h1 className="text-3xl font-bold text-gradient bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
-            GeoTube Pro
+            VideoMap Pro
           </h1>
           
-          <form onSubmit={handleSearchSubmit} className="flex items-center">
-            <input
-              type="text"
-              placeholder="Buscar ciudades, lugares..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="search-input glass-effect bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 w-80"
-            />
-            <button type="submit" className="ml-4 btn-primary bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 px-4 py-2 rounded-lg transition-all duration-300">
+          <form onSubmit={handleSearchSubmit} className="flex items-center relative" ref={searchInputRef}>
+            <div className="relative">
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Buscar ciudades, lugares..."
+                value={searchTerm}
+                onChange={handleSearchChange}
+                onFocus={() => searchTerm.length >= 2 && setShowSuggestions(true)}
+                className="search-input glass-effect bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 w-80"
+              />
+              
+              {showSuggestions && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-2xl z-50 max-h-60 overflow-y-auto">
+                  {loadingSuggestions ? (
+                    <div className="p-3 text-center text-gray-400">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-cyan-400 mx-auto"></div>
+                      <span className="ml-2">Buscando...</span>
+                    </div>
+                  ) : suggestions.length > 0 ? (
+                    suggestions.map((suggestion) => (
+                      <div
+                        key={suggestion.id}
+                        onClick={() => handleSuggestionClick(suggestion)}
+                        className="p-3 hover:bg-gray-700 cursor-pointer border-b border-gray-700 last:border-b-0 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="text-cyan-400">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                          </div>
+                          <span className="text-sm">{suggestion.name}</span>
+                        </div>
+                      </div>
+                    ))
+                  ) : searchTerm.length >= 2 ? (
+                    <div className="p-3 text-center text-gray-400 text-sm">
+                      No se encontraron sugerencias para "{searchTerm}"
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="p-2 text-xs text-gray-400 border-b border-gray-700">
+                        Lugares populares en México
+                      </div>
+                      {popularSuggestions.map((suggestion, index) => (
+                        <div
+                          key={index}
+                          onClick={() => handleSuggestionClick({ name: suggestion })}
+                          className="p-3 hover:bg-gray-700 cursor-pointer border-b border-gray-700 last:border-b-0 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="text-cyan-400">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                            </div>
+                            <span className="text-sm">{suggestion}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <button 
+              type="submit" 
+              className="ml-4 btn-primary bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 px-4 py-2 rounded-lg transition-all duration-300"
+            >
               Buscar
             </button>
           </form>
@@ -726,7 +855,6 @@ const MainApp = () => {
                         }}
                         className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 transition flex items-center gap-2"
                       >
-                        <span>📷</span>
                         Cambiar Foto de Perfil
                       </button>
                       
@@ -738,7 +866,6 @@ const MainApp = () => {
                           }}
                           className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 transition flex items-center gap-2"
                         >
-                          <span>🔒</span>
                           Cambiar Contraseña
                         </button>
                       )}
@@ -747,7 +874,6 @@ const MainApp = () => {
                         onClick={handleLogout}
                         className="w-full text-left px-4 py-3 rounded-xl hover:bg-red-500/20 text-red-400 transition flex items-center gap-2"
                       >
-                        <span>🚪</span>
                         Cerrar Sesión
                       </button>
                     </div>
@@ -766,7 +892,6 @@ const MainApp = () => {
         </div>
       </div>
 
-      {/* Modales */}
       <AuthModal 
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
@@ -786,7 +911,6 @@ const MainApp = () => {
         onPhotoUpdate={handlePhotoUpdate}
       />
 
-      {/* Modal de Ajustes Simplificado */}
       {showSettings && (
         <div className="modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="modal-content max-w-md bg-gray-800 rounded-2xl p-6 border border-gray-700">
@@ -831,9 +955,7 @@ const MainApp = () => {
         </div>
       )}
 
-      {/* Contenido principal */}
       <div className="flex-1 flex pt-20">
-        {/* Mapa */}
         <div className="flex-1 relative">
           <Map
             {...viewport}
@@ -904,7 +1026,6 @@ const MainApp = () => {
           )}
         </div>
 
-        {/* Sidebar */}
         <div className="w-1/3 bg-gradient-to-b from-slate-900 via-purple-900 to-blue-900 overflow-y-auto p-6 flex flex-col">
           <div className="text-center mb-6">
             <h2 className="text-3xl font-bold bg-gradient-to-r from-yellow-400 via-red-400 to-pink-400 bg-clip-text text-transparent">
