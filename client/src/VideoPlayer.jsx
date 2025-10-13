@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import YouTube from 'react-youtube';
-import Map, { Marker, NavigationControl } from 'react-map-gl/mapbox';
+import Map, { Marker, NavigationControl, Popup } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 const VideoPlayer = () => {
@@ -19,10 +19,18 @@ const VideoPlayer = () => {
     zoom: 5
   });
 
+  // NUEVOS ESTADOS PARA INFORMACIÓN DEL VIDEO
+  const [videoLocation, setVideoLocation] = useState(null);
+  const [videoLocationName, setVideoLocationName] = useState('');
+  const [videoStats, setVideoStats] = useState(null);
+  const [showVideoLocation, setShowVideoLocation] = useState(false);
+  const [videoTags, setVideoTags] = useState([]);
+  const [videoCategory, setVideoCategory] = useState('');
+
   const MAPBOX_TOKEN = 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
   const YOUTUBE_API_KEY = 'AIzaSyAmkc92taptBHHwQsQdOJiGW7Wktghl-OI';
 
-  //  NUEVO: Verificar autenticación al cargar el componente
+  // NUEVO: Verificar autenticación al cargar el componente
   useEffect(() => {
     const checkAuth = () => {
       const userData = localStorage.getItem('user');
@@ -37,48 +45,154 @@ const VideoPlayer = () => {
     checkAuth();
   }, []);
 
-  // Función para obtener datos del video desde YouTube API
-  const fetchVideoData = async (videoId) => {
+  // NUEVO: Función para extraer ubicación de la descripción del video
+  const extractLocationFromDescription = (description) => {
+    if (!description) return null;
+    
+    // Buscar patrones comunes de ubicaciones en México
+    const locationPatterns = [
+      /(Ciudad de México|CDMX|Mexico City)/i,
+      /(Cancún|Cancun)/i,
+      /(Guadalajara)/i,
+      /(Monterrey)/i,
+      /(Playa del Carmen)/i,
+      /(Tulum)/i,
+      /(Oaxaca)/i,
+      /(Puerto Vallarta)/i,
+      /(Los Cabos|Cabo San Lucas)/i,
+      /(Mazatlán|Mazatlan)/i,
+      /(Acapulco)/i,
+      /(Chihuahua)/i,
+      /(Mérida|Merida)/i,
+      /(Puebla)/i,
+      /(Querétaro|Queretaro)/i,
+      /(San Luis Potosí|San Luis Potosi)/i,
+      /(Tijuana)/i,
+      /(Veracruz)/i,
+      /(Zacatecas)/i,
+      /(Guanajuato)/i,
+      /(San Miguel de Allende)/i,
+      /(Morelia)/i,
+      /(Cuernavaca)/i,
+      /(Toluca)/i,
+      /(Chiapas)/i,
+      /(Yucatán|Yucatan)/i,
+      /(Quintana Roo)/i,
+      /(Baja California)/i,
+      /(Sonora)/i,
+      /(Jalisco)/i,
+      /(Nuevo León|Nuevo Leon)/i
+    ];
+
+    for (const pattern of locationPatterns) {
+      const match = description.match(pattern);
+      if (match) {
+        return match[1];
+      }
+    }
+    
+    return null;
+  };
+
+  // NUEVO: Función para obtener coordenadas de una ubicación
+  const getLocationCoordinates = async (locationName) => {
     try {
       const response = await fetch(
-        `https://www.googleapis.com/youtube/v3/videos?` +
-        `part=snippet,statistics,contentDetails&` +
-        `id=${videoId}&` +
-        `key=${YOUTUBE_API_KEY}`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(locationName)}.json?access_token=${MAPBOX_TOKEN}&country=mx&limit=1`
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.features && data.features.length > 0) {
+          const [longitude, latitude] = data.features[0].center;
+          return { latitude, longitude, name: data.features[0].place_name };
+        }
+      }
+    } catch (error) {
+      console.error('Error obteniendo coordenadas:', error);
+    }
+    return null;
+  };
+
+  // NUEVO: Función para obtener estadísticas detalladas del video
+  const fetchVideoStatistics = async (videoId) => {
+    try {
+      const response = await fetch(
+        `https://www.googleapis.com/youtube/v3/videos?part=statistics,snippet,contentDetails&id=${videoId}&key=${YOUTUBE_API_KEY}`
       );
 
-      if (!response.ok) {
-        throw new Error('Error al obtener datos del video');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.items && data.items.length > 0) {
+          const video = data.items[0];
+          return {
+            title: video.snippet.title,
+            description: video.snippet.description,
+            channelTitle: video.snippet.channelTitle,
+            publishedAt: video.snippet.publishedAt,
+            viewCount: parseInt(video.statistics.viewCount) || 0,
+            likeCount: parseInt(video.statistics.likeCount) || 0,
+            commentCount: parseInt(video.statistics.commentCount) || 0,
+            favoriteCount: parseInt(video.statistics.favoriteCount) || 0,
+            duration: video.contentDetails.duration,
+            tags: video.snippet.tags || [],
+            categoryId: video.snippet.categoryId,
+            thumbnails: video.snippet.thumbnails
+          };
+        }
       }
-
-      const data = await response.json();
-      
-      if (data.items && data.items.length > 0) {
-        const video = data.items[0];
-        return {
-          title: video.snippet.title,
-          description: video.snippet.description,
-          channelTitle: video.snippet.channelTitle,
-          publishedAt: video.snippet.publishedAt,
-          viewCount: parseInt(video.statistics.viewCount) || 0,
-          likeCount: parseInt(video.statistics.likeCount) || 0,
-          commentCount: parseInt(video.statistics.commentCount) || 0,
-          duration: video.contentDetails.duration
-        };
-      }
-      throw new Error('Video no encontrado');
     } catch (error) {
-      console.error('Error fetching video data:', error);
-      throw error;
+      console.error('Error obteniendo estadísticas:', error);
     }
+    return null;
+  };
+
+  // NUEVO: Función para obtener nombre de categoría
+  const getCategoryName = async (categoryId) => {
+    const categories = {
+      '1': 'Film & Animation',
+      '2': 'Autos & Vehicles',
+      '10': 'Music',
+      '15': 'Pets & Animals',
+      '17': 'Sports',
+      '18': 'Short Movies',
+      '19': 'Travel & Events',
+      '20': 'Gaming',
+      '21': 'Videoblogging',
+      '22': 'People & Blogs',
+      '23': 'Comedy',
+      '24': 'Entertainment',
+      '25': 'News & Politics',
+      '26': 'Howto & Style',
+      '27': 'Education',
+      '28': 'Science & Technology',
+      '29': 'Nonprofits & Activism',
+      '30': 'Movies',
+      '31': 'Anime/Animation',
+      '32': 'Action/Adventure',
+      '33': 'Classics',
+      '34': 'Comedy',
+      '35': 'Documentary',
+      '36': 'Drama',
+      '37': 'Family',
+      '38': 'Foreign',
+      '39': 'Horror',
+      '40': 'Sci-Fi/Fantasy',
+      '41': 'Thriller',
+      '42': 'Shorts',
+      '43': 'Shows',
+      '44': 'Trailers'
+    };
+    
+    return categories[categoryId] || 'Unknown Category';
   };
 
   // Función para cargar videos relacionados desde YouTube
   const fetchRelatedVideos = async (currentVideoId, locationName) => {
     try {
       // Obtener el título del video actual para buscar videos relacionados
-      const currentVideoData = await fetchVideoData(currentVideoId);
-      const searchQuery = currentVideoData.channelTitle || locationName || 'México';
+      const currentVideoData = await fetchVideoStatistics(currentVideoId);
+      const searchQuery = currentVideoData?.channelTitle || locationName || 'México';
 
       const response = await fetch(
         `https://www.googleapis.com/youtube/v3/search?` +
@@ -137,21 +251,43 @@ const VideoPlayer = () => {
           currentLocationName = locationData.name || 'Tu ubicación actual';
         }
 
-        // Obtener datos del video desde YouTube API
-        const videoDetails = await fetchVideoData(videoId);
+        // Obtener datos detallados del video
+        const videoDetails = await fetchVideoStatistics(videoId);
         
+        if (videoDetails) {
+          setVideoData(videoDetails);
+          setVideoStats(videoDetails);
+          setVideoTags(videoDetails.tags.slice(0, 10)); // Limitar a 10 tags
+          
+          // Obtener nombre de categoría
+          const categoryName = await getCategoryName(videoDetails.categoryId);
+          setVideoCategory(categoryName);
+
+          // NUEVO: Intentar extraer ubicación del video
+          const extractedLocation = extractLocationFromDescription(videoDetails.description);
+          if (extractedLocation) {
+            const locationCoords = await getLocationCoordinates(extractedLocation);
+            if (locationCoords) {
+              setVideoLocation({
+                latitude: locationCoords.latitude,
+                longitude: locationCoords.longitude
+              });
+              setVideoLocationName(locationCoords.name);
+              setShowVideoLocation(true);
+              
+              // Centrar mapa en la ubicación del video si se encuentra
+              setViewport({
+                latitude: locationCoords.latitude,
+                longitude: locationCoords.longitude,
+                zoom: 10
+              });
+            }
+          }
+        }
+
         // Cargar videos relacionados
         const relatedVideosData = await fetchRelatedVideos(videoId, currentLocationName);
-
-        setVideoData(videoDetails);
         setRelatedVideos(relatedVideosData);
-        
-        // Centrar mapa en la ubicación actual
-        setViewport({
-          latitude: currentLatitude,
-          longitude: currentLongitude,
-          zoom: 10
-        });
 
       } catch (err) {
         setError(err.message);
@@ -193,6 +329,41 @@ const VideoPlayer = () => {
     return `${minutes}:${seconds.padStart(2, '0')}`;
   };
 
+  // Función para formatear números grandes
+  const formatLargeNumber = (num) => {
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(1) + 'M';
+    } else if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K';
+    }
+    return num.toString();
+  };
+
+  // Función para calcular tiempo desde la publicación
+  const getTimeSincePublished = (publishedAt) => {
+    const published = new Date(publishedAt);
+    const now = new Date();
+    const diffInMs = now - published;
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+    
+    if (diffInDays < 1) {
+      return 'Hoy';
+    } else if (diffInDays === 1) {
+      return 'Ayer';
+    } else if (diffInDays < 7) {
+      return `Hace ${diffInDays} días`;
+    } else if (diffInDays < 30) {
+      const weeks = Math.floor(diffInDays / 7);
+      return `Hace ${weeks} semana${weeks > 1 ? 's' : ''}`;
+    } else if (diffInDays < 365) {
+      const months = Math.floor(diffInDays / 30);
+      return `Hace ${months} mes${months > 1 ? 'es' : ''}`;
+    } else {
+      const years = Math.floor(diffInDays / 365);
+      return `Hace ${years} año${years > 1 ? 's' : ''}`;
+    }
+  };
+
   const handleBackToMap = () => {
     navigate('/');
   };
@@ -203,6 +374,7 @@ const VideoPlayer = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-cyan-400 mx-auto mb-4"></div>
           <div className="text-white text-xl font-light">Cargando video...</div>
+          <div className="text-gray-400 text-sm mt-2">Obteniendo información detallada</div>
         </div>
       </div>
     );
@@ -265,91 +437,200 @@ const VideoPlayer = () => {
             <div className="glass-effect rounded-2xl overflow-hidden border border-gray-700 shadow-2xl bg-gray-800/50">
               <div className="p-4 border-b border-gray-700">
                 <h2 className="text-xl font-semibold text-cyan-400">Reproduciendo Video</h2>
+                {showVideoLocation && (
+                  <p className="text-sm text-green-400 mt-1 flex items-center gap-2">
+                    <span>📍</span>
+                    <span>Ubicación detectada: {videoLocationName}</span>
+                  </p>
+                )}
               </div>
               <div className="bg-black">
                 <YouTube videoId={videoId} opts={youtubeOpts} />
               </div>
             </div>
 
-            {/* Información del Video */}
+            {/* Información del Video - MEJORADA */}
             <div className="glass-effect rounded-2xl p-6 border border-gray-700 bg-gray-800/50">
-              <h1 className="text-2xl font-bold mb-3 text-white">{videoData.title}</h1>
+              <h1 className="text-2xl font-bold mb-3 text-white">{videoData?.title}</h1>
               
+              {/* Estadísticas Principales */}
               <div className="flex flex-wrap items-center gap-4 text-gray-300 mb-6">
                 <div className="flex items-center gap-2">
                   <span className="bg-blue-500/20 px-3 py-1 rounded-full text-sm border border-blue-500/30">
-                    {videoData.viewCount.toLocaleString()} visualizaciones
+                    👁️ {formatLargeNumber(videoStats?.viewCount)} visualizaciones
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="bg-green-500/20 px-3 py-1 rounded-full text-sm border border-green-500/30">
-                    {videoData.likeCount.toLocaleString()} me gusta
+                    👍 {formatLargeNumber(videoStats?.likeCount)} me gusta
                   </span>
                 </div>
-                {videoData.duration && (
+                <div className="flex items-center gap-2">
+                  <span className="bg-purple-500/20 px-3 py-1 rounded-full text-sm border border-purple-500/30">
+                    💬 {formatLargeNumber(videoStats?.commentCount)} comentarios
+                  </span>
+                </div>
+                {videoStats?.duration && (
                   <div className="flex items-center gap-2">
-                    <span className="bg-purple-500/20 px-3 py-1 rounded-full text-sm border border-purple-500/30">
-                      {formatDuration(videoData.duration)}
+                    <span className="bg-yellow-500/20 px-3 py-1 rounded-full text-sm border border-yellow-500/30">
+                      ⏱️ {formatDuration(videoStats.duration)}
                     </span>
                   </div>
                 )}
-                <div className="text-sm">
-                  Subido el {new Date(videoData.publishedAt).toLocaleDateString('es-ES', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
-                </div>
+                {videoCategory && (
+                  <div className="flex items-center gap-2">
+                    <span className="bg-pink-500/20 px-3 py-1 rounded-full text-sm border border-pink-500/30">
+                      🏷️ {videoCategory}
+                    </span>
+                  </div>
+                )}
               </div>
-              
+
+              {/* Información de Ubicación - NUEVA SECCIÓN */}
+              {showVideoLocation && (
+                <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-xl p-4 mb-6 border border-green-500/30">
+                  <h3 className="font-semibold mb-3 text-green-400 text-lg flex items-center gap-2">
+                    📍 Información de Ubicación Detectada
+                  </h3>
+                  <p className="text-white text-lg mb-2">{videoLocationName}</p>
+                  <div className="flex items-center gap-4 text-sm text-gray-300">
+                    <span>Lat: {videoLocation?.latitude.toFixed(4)}</span>
+                    <span>Lng: {videoLocation?.longitude.toFixed(4)}</span>
+                    <button 
+                      onClick={() => {
+                        setViewport({
+                          latitude: videoLocation.latitude,
+                          longitude: videoLocation.longitude,
+                          zoom: 12
+                        });
+                      }}
+                      className="ml-auto bg-green-500 hover:bg-green-600 px-3 py-1 rounded text-xs transition-colors"
+                    >
+                      Centrar Mapa
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Información del Canal */}
               <div className="bg-gray-800/50 rounded-xl p-4 mb-6 border border-gray-700">
-                <h3 className="font-semibold mb-3 text-cyan-400 text-lg">Canal</h3>
-                <p className="text-white text-lg mb-2">{videoData.channelTitle}</p>
+                <h3 className="font-semibold mb-3 text-cyan-400 text-lg">🎬 Información del Canal</h3>
+                <p className="text-white text-lg mb-2">{videoData?.channelTitle}</p>
+                <div className="flex items-center gap-4 text-sm text-gray-400">
+                  <span>
+                    Publicado: {getTimeSincePublished(videoData?.publishedAt)}
+                  </span>
+                  <span>•</span>
+                  <span>
+                    {new Date(videoData?.publishedAt).toLocaleDateString('es-ES', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </span>
+                </div>
                 {userLocationName && (
-                  <p className="text-gray-400 text-sm">
-                    Ubicación actual: {userLocationName}
+                  <p className="text-gray-400 text-sm mt-2">
+                    📍 Tu ubicación actual: {userLocationName}
                   </p>
                 )}
               </div>
 
               {/* Descripción del Video */}
-              {videoData.description && (
+              {videoData?.description && (
                 <div className="bg-gray-800/50 rounded-xl p-4 mb-6 border border-gray-700">
-                  <h3 className="font-semibold mb-3 text-cyan-400 text-lg">Descripción</h3>
+                  <h3 className="font-semibold mb-3 text-cyan-400 text-lg">📝 Descripción</h3>
                   <p className="text-gray-300 whitespace-pre-wrap">
-                    {videoData.description.length > 300 
-                      ? `${videoData.description.substring(0, 300)}...` 
+                    {videoData.description.length > 400 
+                      ? `${videoData.description.substring(0, 400)}...` 
                       : videoData.description
                     }
                   </p>
+                  {videoData.description.length > 400 && (
+                    <button className="text-cyan-400 text-sm mt-2 hover:text-cyan-300">
+                      Ver descripción completa
+                    </button>
+                  )}
                 </div>
               )}
 
-              {/* Estadísticas Avanzadas */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Etiquetas del Video */}
+              {videoTags.length > 0 && (
+                <div className="bg-gray-800/50 rounded-xl p-4 mb-6 border border-gray-700">
+                  <h3 className="font-semibold mb-3 text-cyan-400 text-lg">🏷️ Etiquetas</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {videoTags.map((tag, index) => (
+                      <span 
+                        key={index}
+                        className="bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full text-sm border border-blue-500/30"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Estadísticas Avanzadas - MEJORADA */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                 <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-xl p-4 border border-blue-500/20 text-center">
-                  <div className="text-2xl font-bold text-cyan-400">{videoData.viewCount.toLocaleString()}</div>
-                  <div className="text-sm text-gray-400 mt-1">Total Reproducciones</div>
+                  <div className="text-2xl font-bold text-cyan-400">{formatLargeNumber(videoStats?.viewCount)}</div>
+                  <div className="text-sm text-gray-400 mt-1">Reproducciones</div>
                 </div>
                 <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-xl p-4 border border-green-500/20 text-center">
-                  <div className="text-2xl font-bold text-green-400">{videoData.likeCount.toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-green-400">{formatLargeNumber(videoStats?.likeCount)}</div>
                   <div className="text-sm text-gray-400 mt-1">Me Gusta</div>
                 </div>
                 <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-xl p-4 border border-purple-500/20 text-center">
-                  <div className="text-2xl font-bold text-purple-400">{videoData.commentCount.toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-purple-400">{formatLargeNumber(videoStats?.commentCount)}</div>
                   <div className="text-sm text-gray-400 mt-1">Comentarios</div>
                 </div>
+                <div className="bg-gradient-to-br from-yellow-500/10 to-orange-500/10 rounded-xl p-4 border border-yellow-500/20 text-center">
+                  <div className="text-2xl font-bold text-yellow-400">
+                    {formatLargeNumber(videoStats?.favoriteCount || 0)}
+                  </div>
+                  <div className="text-sm text-gray-400 mt-1">Favoritos</div>
+                </div>
               </div>
+
+              {/* Metadatos Adicionales */}
+              {videoStats && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div className="bg-gray-800/30 rounded-lg p-3">
+                    <span className="text-gray-400">Publicado: </span>
+                    <span className="text-white">
+                      {new Date(videoStats.publishedAt).toLocaleDateString('es-ES', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </span>
+                  </div>
+                  <div className="bg-gray-800/30 rounded-lg p-3">
+                    <span className="text-gray-400">Duración: </span>
+                    <span className="text-white">{formatDuration(videoStats.duration)}</span>
+                  </div>
+                  <div className="bg-gray-800/30 rounded-lg p-3">
+                    <span className="text-gray-400">Categoría: </span>
+                    <span className="text-white">{videoCategory}</span>
+                  </div>
+                  <div className="bg-gray-800/30 rounded-lg p-3">
+                    <span className="text-gray-400">ID del Video: </span>
+                    <span className="text-white font-mono text-xs">{videoId}</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Sidebar - Mapa y Videos Relacionados */}
           <div className="xl:w-1/3 space-y-6">
-            {/* Mapa de Ubicación */}
+            {/* Mapa de Ubicación - MEJORADO */}
             <div className="glass-effect rounded-2xl overflow-hidden border border-gray-700 bg-gray-800/50">
               <div className="p-4 border-b border-gray-700">
-                <h3 className="font-semibold text-cyan-400 text-lg">Tu Ubicación en el Mapa</h3>
+                <h3 className="font-semibold text-cyan-400 text-lg">
+                  {showVideoLocation ? 'Ubicación del Video' : 'Mapa'}
+                </h3>
               </div>
               <div className="h-80">
                 <Map
@@ -361,7 +642,25 @@ const VideoPlayer = () => {
                 >
                   <NavigationControl position="top-right" />
                   
-                  {/* Marcador de ubicación del usuario si está disponible */}
+                  {/* Marcador de ubicación del video */}
+                  {showVideoLocation && videoLocation && (
+                    <Marker
+                      latitude={videoLocation.latitude}
+                      longitude={videoLocation.longitude}
+                    >
+                      <div className="cursor-pointer">
+                        <div className="relative">
+                          <div className="h-8 w-8 bg-gradient-to-r from-green-500 to-emerald-500 border-2 border-white rounded-full animate-ping absolute"></div>
+                          <div className="h-6 w-6 bg-gradient-to-r from-green-500 to-emerald-500 border-2 border-white rounded-full relative"></div>
+                          <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                            📍 Video
+                          </div>
+                        </div>
+                      </div>
+                    </Marker>
+                  )}
+                  
+                  {/* Marcador de ubicación del usuario */}
                   {userLocation && (
                     <Marker
                       latitude={userLocation.latitude}
@@ -369,8 +668,10 @@ const VideoPlayer = () => {
                     >
                       <div className="cursor-pointer">
                         <div className="relative">
-                          <div className="h-6 w-6 bg-gradient-to-r from-blue-500 to-cyan-500 border-2 border-white rounded-full animate-pulse absolute"></div>
-                          <div className="h-4 w-4 bg-gradient-to-r from-blue-500 to-cyan-500 border-2 border-white rounded-full relative"></div>
+                          <div className="h-6 w-6 bg-gradient-to-r from-blue-500 to-cyan-500 border-2 border-white rounded-full"></div>
+                          <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                           Ubicacion
+                          </div>
                         </div>
                       </div>
                     </Marker>
@@ -378,11 +679,22 @@ const VideoPlayer = () => {
                 </Map>
               </div>
               <div className="p-4 border-t border-gray-700">
-                <div className="flex items-center justify-between text-sm">
+                <div className="space-y-2">
+                  {showVideoLocation && (
+                    <div className="flex items-center gap-2">
+                      <div className="h-3 w-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full animate-pulse"></div>
+                      <span className="text-sm">Ubicación del video: {videoLocationName}</span>
+                    </div>
+                  )}
                   {userLocation && (
                     <div className="flex items-center gap-2">
-                      <div className="h-3 w-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full animate-pulse"></div>
-                      <span>Tu Ubicación: {userLocationName}</span>
+                      <div className="h-3 w-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"></div>
+                      <span className="text-sm">Tu ubicación: {userLocationName}</span>
+                    </div>
+                  )}
+                  {!showVideoLocation && !userLocation && (
+                    <div className="text-center text-gray-400 text-sm">
+                      No se detectó ubicación específica para este video
                     </div>
                   )}
                 </div>
@@ -392,7 +704,7 @@ const VideoPlayer = () => {
             {/* Videos Relacionados */}
             <div className="glass-effect rounded-2xl border border-gray-700 bg-gray-800/50">
               <div className="p-4 border-b border-gray-700">
-                <h3 className="font-semibold text-cyan-400 text-lg">Videos Relacionados</h3>
+                <h3 className="font-semibold text-cyan-400 text-lg">📺 Videos Relacionados</h3>
               </div>
               <div className="max-h-96 overflow-y-auto">
                 {relatedVideos.length > 0 ? (
@@ -422,7 +734,7 @@ const VideoPlayer = () => {
                             {video.channelTitle}
                           </p>
                           <p className="text-xs text-cyan-400 mt-1">
-                            {new Date(video.publishedAt).toLocaleDateString('es-ES')}
+                            {getTimeSincePublished(video.publishedAt)}
                           </p>
                         </div>
                       </div>
@@ -433,6 +745,29 @@ const VideoPlayer = () => {
                     <p className="text-gray-400">No hay videos relacionados disponibles</p>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Información Técnica */}
+            <div className="glass-effect rounded-2xl border border-gray-700 bg-gray-800/50 p-4">
+              <h3 className="font-semibold text-cyan-400 text-lg mb-3">🔧 Información Técnica</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Video ID:</span>
+                  <span className="text-white font-mono">{videoId}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Resolución:</span>
+                  <span className="text-white">1080p</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Plataforma:</span>
+                  <span className="text-white">YouTube</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Reproductor:</span>
+                  <span className="text-white">YouTube IFrame API</span>
+                </div>
               </div>
             </div>
           </div>
