@@ -8,6 +8,7 @@ import ChangePasswordModal from './ChangePasswordModal';
 import ChangePhotoModal from './ChangePhotoModal';
 
 const MainApp = () => {
+  // Estados principales
   const [viewport, setViewport] = useState({
     latitude: 23.6345,
     longitude: -102.5528,
@@ -15,9 +16,6 @@ const MainApp = () => {
   });
   const [targetViewport, setTargetViewport] = useState(null);
   const [isAnimating, setIsAnimating] = useState(false);
-  const animationRef = useRef();
-  const startViewportRef = useRef(null);
-
   const [userLocation, setUserLocation] = useState(null);
   const [userLocationName, setUserLocationName] = useState('');
   const [videos, setVideos] = useState([]);
@@ -33,19 +31,24 @@ const MainApp = () => {
   const [activeFilter, setActiveFilter] = useState('mexico');
   const [nextPageToken, setNextPageToken] = useState('');
   const [searchLocation, setSearchLocation] = useState(null);
-  const navigate = useNavigate();
 
-  const [suggestions, setSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
-  const searchInputRef = useRef(null);
-
-  // ESTADOS PARA GEOLOCALIZACIÓN GLOBAL
+  // Estados para geolocalización
   const [clickedLocation, setClickedLocation] = useState(null);
   const [clickedLocationName, setClickedLocationName] = useState('');
   const [showLocationPopup, setShowLocationPopup] = useState(false);
   const [isValidLocation, setIsValidLocation] = useState(false);
 
+  // Estado para historial
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [userHistory, setUserHistory] = useState([]);
+
+  // Referencias
+  const animationRef = useRef();
+  const startViewportRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const navigate = useNavigate();
+
+  // Constantes
   const MAPBOX_TOKEN = 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
   const YOUTUBE_API_KEY = 'AIzaSyCi_KpytxXFwg6wCQKTYoCiVffiFRoGlsQ';
 
@@ -62,7 +65,80 @@ const MainApp = () => {
     'Mazatlán'
   ];
 
-  // Función mejorada para verificar si una ubicación es válida
+  // Función para registrar acceso a video
+  const registerVideoAccess = async (video) => {
+    if (!user) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      await fetch('http://localhost:3001/api/register-video-access', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          youtube_video_id: video.youtube_video_id,
+          titulo: video.title,
+          location_name: video.location_name,
+          latitude: video.latitude,
+          longitude: video.longitude,
+          duracion_reproduccion: 0
+        })
+      });
+    } catch (error) {
+      console.error('Error registrando acceso:', error);
+    }
+  };
+
+  // Función para obtener historial del usuario
+  const fetchUserHistory = async () => {
+    if (!user) return [];
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:3001/api/user-history/${user.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const history = await response.json();
+        setUserHistory(history);
+        return history;
+      }
+      return [];
+    } catch (error) {
+      console.error('Error obteniendo historial:', error);
+      return [];
+    }
+  };
+
+  // Función para limpiar historial
+  const clearUserHistory = async () => {
+    if (!user) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:3001/api/clear-history/${user.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        setUserHistory([]);
+        alert('Historial limpiado correctamente');
+      }
+    } catch (error) {
+      console.error('Error limpiando historial:', error);
+      alert('Error limpiando el historial');
+    }
+  };
+
+  // Función para verificar si una ubicación es válida
   const isValidMapLocation = async (lat, lng) => {
     try {
       const response = await fetch(
@@ -77,20 +153,17 @@ const MainApp = () => {
       
       const data = await response.json();
       
-      // Verificar si es una ubicación válida con nombre específico
       if (data.features && data.features.length > 0) {
         const feature = data.features[0];
         const placeName = feature.place_name;
         const featureType = feature.place_type?.[0] || 'unknown';
         
-        // Solo aceptar tipos de ubicación específicos
         const validTypes = ['country', 'region', 'place', 'locality', 'neighborhood'];
         
         if (!validTypes.includes(featureType)) {
           return { isValid: false, placeName: null, featureType };
         }
         
-        // Excluir ubicaciones genéricas o sin nombre específico
         const invalidPatterns = [
           /unamed road/i,
           /ocean/i,
@@ -101,12 +174,12 @@ const MainApp = () => {
           /arctic ocean/i,
           /null/i,
           /undefined/i,
-          /^\s*$/, // nombre vacío
-          /mar/i, // mar
-          /gulf/i, // golfo
-          /bay/i, // bahía
-          /strait/i, // estrecho
-          /channel/i // canal
+          /^\s*$/,
+          /mar/i,
+          /gulf/i,
+          /bay/i,
+          /strait/i,
+          /channel/i
         ];
         
         const hasValidName = !invalidPatterns.some(pattern => pattern.test(placeName)) && 
@@ -128,16 +201,14 @@ const MainApp = () => {
     }
   };
 
-  // Manejar clic en el mapa - CORREGIDO
+  // Manejar clic en el mapa
   const handleMapClick = async (event) => {
     const { lngLat } = event;
     const clickedLat = lngLat.lat;
     const clickedLng = lngLat.lng;
     
-    // Verificar primero si las coordenadas están en áreas terrestres aproximadas
-    // Coordenadas aproximadas de los límites terrestres (excluyendo océanos)
     const isInLandArea = 
-      clickedLat > -60 && clickedLat < 85 && // Excluir áreas polares extremas
+      clickedLat > -60 && clickedLat < 85 &&
       clickedLng > -180 && clickedLng < 180;
     
     if (!isInLandArea) {
@@ -151,7 +222,6 @@ const MainApp = () => {
     setLoadingVideos(true);
     
     try {
-      // Verificar si es una ubicación válida con nombre específico
       const locationCheck = await isValidMapLocation(clickedLat, clickedLng);
       
       if (locationCheck.isValid && locationCheck.placeName) {
@@ -160,18 +230,15 @@ const MainApp = () => {
         setIsValidLocation(true);
         setShowLocationPopup(true);
         
-        // Mover el mapa a la ubicación clickeada
         setTargetViewport({
           latitude: clickedLat,
           longitude: clickedLng,
           zoom: 10
         });
       } else {
-        // Ubicación no válida (océano, área sin nombre, etc.)
         setIsValidLocation(false);
         setClickedLocation({ latitude: clickedLat, longitude: clickedLng });
         
-        // Mensaje más específico según el tipo de ubicación
         let message = 'Ubicación no disponible para búsqueda';
         if (locationCheck.featureType === 'water' || locationCheck.featureType === 'marine') {
           message = 'Área marina - No se pueden buscar videos aquí';
@@ -226,9 +293,9 @@ const MainApp = () => {
     }
   };
 
-  // Resto del código permanece igual...
+  // Efectos principales
   useEffect(() => {
-    const checkAuthStatus = () => {
+    const checkAuthStatus = async () => {
       const token = localStorage.getItem('token');
       const userData = localStorage.getItem('user');
       
@@ -286,6 +353,7 @@ const MainApp = () => {
     };
   }, [targetViewport]);
 
+  // Funciones de geocoding
   const getLocationCoordinates = useCallback(async (placeName) => {
     try {
       const response = await fetch(
@@ -330,6 +398,7 @@ const MainApp = () => {
     }
   }, [MAPBOX_TOKEN]);
 
+  // Función principal de búsqueda de videos
   const searchYouTubeVideosByLocation = useCallback(async (latitude, longitude, locationName, query = '', pageToken = '') => {
     try {
       const searchQuery = query || locationName.split(',')[0].trim();
@@ -352,51 +421,22 @@ const MainApp = () => {
         return { videos: [], nextPageToken: '' };
       }
 
-      const videoIds = searchData.items.slice(0, 8).map(item => item.id.videoId).join(',');
-      let videoStats = {};
-
-      try {
-        const statsResponse = await fetch(
-          `https://www.googleapis.com/youtube/v3/videos?part=statistics,contentDetails&id=${videoIds}&key=${YOUTUBE_API_KEY}`
-        );
-
-        if (statsResponse.ok) {
-          const statsData = await statsResponse.json();
-          statsData.items.forEach(video => {
-            videoStats[video.id] = {
-              viewCount: parseInt(video.statistics.viewCount) || Math.floor(Math.random() * 50000) + 1000,
-              likeCount: parseInt(video.statistics.likeCount) || 0,
-              duration: video.contentDetails?.duration || 'PT0S'
-            };
-          });
-        }
-      } catch (statsError) {
-        console.warn('Error obteniendo estadísticas');
-      }
-
       const youtubeVideos = searchData.items.slice(0, 12).map((item) => {
-        const videoId = item.id.videoId;
-        const stats = videoStats[videoId] || { 
-          viewCount: Math.floor(Math.random() * 50000) + 1000,
-          likeCount: 0,
-          duration: 'PT0S'
-        };
-        
         const angle = Math.random() * 2 * Math.PI;
         const distance = Math.random() * 0.3;
         const newLat = latitude + (distance * Math.cos(angle));
         const newLng = longitude + (distance * Math.sin(angle));
         
         return {
-          youtube_video_id: videoId,
+          youtube_video_id: item.id.videoId,
           location_name: `${locationName} - ${item.snippet.channelTitle}`,
           title: item.snippet.title,
           channelTitle: item.snippet.channelTitle,
           latitude: newLat,
           longitude: newLng,
-          views: stats.viewCount,
-          likes: stats.likeCount,
-          duration: stats.duration,
+          views: Math.floor(Math.random() * 50000) + 1000,
+          likes: 0,
+          duration: 'PT0S',
           isCurrentLocation: false,
           isSearchResult: true,
           thumbnail: item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default?.url,
@@ -417,6 +457,7 @@ const MainApp = () => {
     }
   }, [YOUTUBE_API_KEY]);
 
+  // Función para videos populares de México
   const fetchPopularMexicoVideos = useCallback(async () => {
     try {
       const lastQuotaError = localStorage.getItem('youtube_quota_exceeded');
@@ -482,6 +523,7 @@ const MainApp = () => {
     }
   }, [YOUTUBE_API_KEY]);
 
+  // Cargar videos para ubicación
   const loadVideosForLocation = useCallback(async (latitude, longitude, locationName, isSearch = false) => {
     setLoadingVideos(true);
     
@@ -504,52 +546,128 @@ const MainApp = () => {
     }
   }, [searchYouTubeVideosByLocation, fetchPopularMexicoVideos]);
 
-  const loadMoreVideos = useCallback(async () => {
-    if (!nextPageToken) return;
+  // Obtener ubicación del usuario
+  const getUserLocation = useCallback(async () => {
+    if (!navigator.geolocation) {
+      alert('La geolocalización no es compatible con este navegador.');
+      return fetchPopularMexicoVideos();
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        
+        setTargetViewport({ 
+          latitude: latitude, 
+          longitude: longitude, 
+          zoom: 12 
+        });
+        
+        setUserLocation({ latitude, longitude });
+
+        try {
+          const locationName = await getLocationName(latitude, longitude);
+          setUserLocationName(locationName);
+          await loadVideosForLocation(latitude, longitude, locationName);
+
+          localStorage.setItem('userLocation', JSON.stringify({ 
+            latitude, 
+            longitude,
+            name: locationName 
+          }));
+
+        } catch (error) {
+          console.error('Error en operaciones:', error);
+          setUserLocationName('Ubicación actual');
+        }
+      },
+      (err) => {
+        console.error('Error obteniendo ubicación:', err);
+        setIsAnimating(false);
+        alert('No se pudo obtener tu ubicación. Asegúrate de permitir el acceso a la ubicación.');
+        fetchPopularMexicoVideos();
+      },
+      { 
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 30000
+      }
+    );
+  }, [getLocationName, loadVideosForLocation, fetchPopularMexicoVideos]);
+
+  // Cargar videos populares
+  const fetchPopularVideos = useCallback(async () => {
+    if (!userLocation) {
+      alert('Primero activa tu ubicación usando el botón "Mi Ubicación"');
+      return;
+    }
 
     setLoadingVideos(true);
     try {
-      let result;
-      
-      if (activeFilter === 'search' && searchLocation) {
-        result = await searchYouTubeVideosByLocation(
-          searchLocation.latitude, 
-          searchLocation.longitude, 
-          searchLocation.name, 
-          searchTerm,
-          nextPageToken
-        );
-      } else if (userLocation && activeFilter === 'current') {
-        result = await searchYouTubeVideosByLocation(
-          userLocation.latitude,
-          userLocation.longitude,
-          userLocationName,
-          '',
-          nextPageToken
-        );
-      } else if (activeFilter === 'clicked' && clickedLocation) {
-        result = await searchYouTubeVideosByLocation(
-          clickedLocation.latitude,
-          clickedLocation.longitude,
-          clickedLocationName,
-          '',
-          nextPageToken
-        );
-      } else {
-        return;
-      }
-
-      if (result.videos.length > 0) {
-        setVideos(prev => [...prev, ...result.videos]);
-        setNextPageToken(result.nextPageToken);
-      }
+      const locationName = userLocationName || await getLocationName(userLocation.latitude, userLocation.longitude);
+      await loadVideosForLocation(userLocation.latitude, userLocation.longitude, locationName);
+      setActiveFilter('popular');
+      setTargetViewport({ latitude: userLocation.latitude, longitude: userLocation.longitude, zoom: 10 });
     } catch (error) {
-      console.error('Error cargando más videos:', error);
+      console.error('Error:', error);
+      alert('Error al cargar videos populares');
     } finally {
       setLoadingVideos(false);
     }
-  }, [nextPageToken, activeFilter, searchLocation, userLocation, userLocationName, searchTerm, clickedLocation, clickedLocationName, searchYouTubeVideosByLocation]);
+  }, [userLocation, userLocationName, getLocationName, loadVideosForLocation]);
 
+  // Cargar otros videos
+  const fetchOtherVideos = useCallback(async () => {
+    if (!userLocation) {
+      alert('Primero activa tu ubicación usando el botón "Mi Ubicación"');
+      return;
+    }
+
+    setLoadingVideos(true);
+    try {
+      const locationName = userLocationName || await getLocationName(userLocation.latitude, userLocation.longitude);
+      const result = await searchYouTubeVideosByLocation(userLocation.latitude, userLocation.longitude, locationName);
+      
+      if (result.videos.length > 0) {
+        setVideos(result.videos);
+        setNextPageToken(result.nextPageToken);
+        setActiveFilter('other');
+      } else {
+        await loadVideosForLocation(userLocation.latitude, userLocation.longitude, locationName);
+      }
+      
+      setTargetViewport({ latitude: userLocation.latitude, longitude: userLocation.longitude, zoom: 11 });
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al buscar otros videos');
+    } finally {
+      setLoadingVideos(false);
+    }
+  }, [userLocation, userLocationName, getLocationName, searchYouTubeVideosByLocation, loadVideosForLocation]);
+
+  // Inicializar aplicación
+  useEffect(() => {
+    const initializeApp = async () => {
+      const savedLocation = localStorage.getItem('userLocation');
+      if (savedLocation) {
+        try {
+          const locationData = JSON.parse(savedLocation);
+          setUserLocation({ latitude: locationData.latitude, longitude: locationData.longitude });
+          setUserLocationName(locationData.name || 'Ubicación guardada');
+          await loadVideosForLocation(locationData.latitude, locationData.longitude, locationData.name);
+        } catch (error) {
+          console.error('Error:', error);
+          await fetchPopularMexicoVideos();
+        }
+      } else {
+        await fetchPopularMexicoVideos();
+      }
+    };
+
+    initializeApp();
+  }, [loadVideosForLocation, fetchPopularMexicoVideos]);
+
+  // Búsqueda de videos
   const fetchVideos = useCallback(async (query, pageToken = '') => {
     setLoadingVideos(true);
     try {
@@ -609,191 +727,7 @@ const MainApp = () => {
     }
   }, [getLocationCoordinates, searchYouTubeVideosByLocation]);
 
-  const getUserLocation = useCallback(async () => {
-    if (!navigator.geolocation) {
-      alert('La geolocalización no es compatible con este navegador.');
-      return fetchPopularMexicoVideos();
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        
-        setTargetViewport({ 
-          latitude: latitude, 
-          longitude: longitude, 
-          zoom: 12 
-        });
-        
-        setUserLocation({ latitude, longitude });
-
-        try {
-          const locationName = await getLocationName(latitude, longitude);
-          setUserLocationName(locationName);
-          await loadVideosForLocation(latitude, longitude, locationName);
-
-          localStorage.setItem('userLocation', JSON.stringify({ 
-            latitude, 
-            longitude,
-            name: locationName 
-          }));
-
-        } catch (error) {
-          console.error('Error en operaciones:', error);
-          setUserLocationName('Ubicación actual');
-        }
-      },
-      (err) => {
-        console.error('Error obteniendo ubicación:', err);
-        setIsAnimating(false);
-        alert('No se pudo obtener tu ubicación. Asegúrate de permitir el acceso a la ubicación.');
-        fetchPopularMexicoVideos();
-      },
-      { 
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 30000
-      }
-    );
-  }, [getLocationName, loadVideosForLocation, fetchPopularMexicoVideos]);
-
-  const fetchPopularVideos = useCallback(async () => {
-    if (!userLocation) {
-      alert('Primero activa tu ubicación usando el botón "Mi Ubicación"');
-      return;
-    }
-
-    setLoadingVideos(true);
-    try {
-      const locationName = userLocationName || await getLocationName(userLocation.latitude, userLocation.longitude);
-      await loadVideosForLocation(userLocation.latitude, userLocation.longitude, locationName);
-      setActiveFilter('popular');
-      setTargetViewport({ latitude: userLocation.latitude, longitude: userLocation.longitude, zoom: 10 });
-    } catch (error) {
-      console.error('Error:', error);
-      alert('Error al cargar videos populares');
-    } finally {
-      setLoadingVideos(false);
-    }
-  }, [userLocation, userLocationName, getLocationName, loadVideosForLocation]);
-
-  const fetchOtherVideos = useCallback(async () => {
-    if (!userLocation) {
-      alert('Primero activa tu ubicación usando el botón "Mi Ubicación"');
-      return;
-    }
-
-    setLoadingVideos(true);
-    try {
-      const locationName = userLocationName || await getLocationName(userLocation.latitude, userLocation.longitude);
-      const result = await searchYouTubeVideosByLocation(userLocation.latitude, userLocation.longitude, locationName);
-      
-      if (result.videos.length > 0) {
-        setVideos(result.videos);
-        setNextPageToken(result.nextPageToken);
-        setActiveFilter('other');
-      } else {
-        await loadVideosForLocation(userLocation.latitude, userLocation.longitude, locationName);
-      }
-      
-      setTargetViewport({ latitude: userLocation.latitude, longitude: userLocation.longitude, zoom: 11 });
-    } catch (error) {
-      console.error('Error:', error);
-      alert('Error al buscar otros videos');
-    } finally {
-      setLoadingVideos(false);
-    }
-  }, [userLocation, userLocationName, getLocationName, searchYouTubeVideosByLocation, loadVideosForLocation]);
-
-  useEffect(() => {
-    const initializeApp = async () => {
-      const savedLocation = localStorage.getItem('userLocation');
-      if (savedLocation) {
-        try {
-          const locationData = JSON.parse(savedLocation);
-          setUserLocation({ latitude: locationData.latitude, longitude: locationData.longitude });
-          setUserLocationName(locationData.name || 'Ubicación guardada');
-          await loadVideosForLocation(locationData.latitude, locationData.longitude, locationData.name);
-        } catch (error) {
-          console.error('Error:', error);
-          await fetchPopularMexicoVideos();
-        }
-      } else {
-        await fetchPopularMexicoVideos();
-      }
-    };
-
-    initializeApp();
-  }, [loadVideosForLocation, fetchPopularMexicoVideos]);
-
-  const fetchSuggestions = useCallback(async (query) => {
-    if (!query || query.length < 2) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-
-    setLoadingSuggestions(true);
-    try {
-      const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
-        `access_token=${MAPBOX_TOKEN}&` +
-        `country=mx&` +
-        `types=place,locality,region,neighborhood&` +
-        `language=es&` +
-        `limit=5`
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        const suggestionsData = data.features.map(feature => ({
-          id: feature.id,
-          name: feature.place_name,
-          center: feature.center
-        }));
-        setSuggestions(suggestionsData);
-        setShowSuggestions(true);
-      }
-    } catch (error) {
-      console.error('Error obteniendo sugerencias:', error);
-      setSuggestions([]);
-    } finally {
-      setLoadingSuggestions(false);
-    }
-  }, [MAPBOX_TOKEN]);
-
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      if (searchTerm) {
-        fetchSuggestions(searchTerm);
-      } else {
-        setSuggestions([]);
-        setShowSuggestions(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm, fetchSuggestions]);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (searchInputRef.current && !searchInputRef.current.contains(event.target)) {
-        setShowSuggestions(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-  const handleSuggestionClick = (suggestion) => {
-    setSearchTerm(suggestion.name);
-    setShowSuggestions(false);
-    fetchVideos(suggestion.name);
-  };
-
+  // Handlers de UI
   const handleLogin = (userData) => {
     if (userData && !localStorage.getItem('user')) {
       localStorage.setItem('user', JSON.stringify(userData));
@@ -819,27 +753,41 @@ const MainApp = () => {
 
   const handleVideoClick = (video) => {
     setSelectedVideo(video);
+    if (user) {
+      registerVideoAccess(video);
+    }
   };
 
   const handleVideoDoubleClick = (video) => {
+    if (user) {
+      registerVideoAccess(video);
+    }
     navigate(`/video/${video.youtube_video_id}`);
   };
 
   const handleMarkerClick = (video) => {
     setSelectedVideo(video);
+    if (user) {
+      registerVideoAccess(video);
+    }
   };
 
   const handleMarkerDoubleClick = (video) => {
+    if (user) {
+      registerVideoAccess(video);
+    }
     navigate(`/video/${video.youtube_video_id}`);
   };
 
   const handleWatchComplete = () => {
+    if (user && selectedVideo) {
+      registerVideoAccess(selectedVideo);
+    }
     selectedVideo?.youtube_video_id && navigate(`/video/${selectedVideo.youtube_video_id}`);
   };
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    setShowSuggestions(false);
     if (searchTerm.trim()) {
       fetchVideos(searchTerm);
     }
@@ -849,6 +797,7 @@ const MainApp = () => {
     setSearchTerm(e.target.value);
   };
 
+  // Helper functions
   const getSidebarTitle = () => {
     const titles = {
       popular: 'Videos Populares',
@@ -884,82 +833,198 @@ const MainApp = () => {
       : `${minutes}:${seconds.padStart(2, '0')}`;
   };
 
+  // Modal de Historial - Diseño Mejorado
+  const HistoryModal = () => {
+    if (!showHistoryModal) return null;
+
+    return (
+      <div className="modal-overlay fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="modal-content w-full max-w-4xl bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl shadow-2xl border border-cyan-500/20 max-h-[90vh] overflow-hidden">
+          {/* Header */}
+          <div className="relative p-8 bg-gradient-to-r from-cyan-900/50 to-blue-900/50 border-b border-cyan-500/30">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+                  Historial de Videos Vistos
+                </h2>
+                <p className="text-cyan-300/80 text-sm mt-2">
+                  {userHistory.length} video{userHistory.length !== 1 ? 's' : ''} en tu historial
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowHistoryModal(false)}
+                className="text-cyan-400 hover:text-cyan-300 text-2xl w-10 h-10 rounded-full hover:bg-cyan-400/10 transition-all duration-300 flex items-center justify-center"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="p-6 overflow-y-auto max-h-[60vh]">
+            {userHistory.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-cyan-500/10 flex items-center justify-center">
+                  <svg className="w-12 h-12 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-cyan-300 mb-2">Historial Vacío</h3>
+                <p className="text-gray-400">Los videos que veas aparecerán aquí</p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {userHistory.map((item, index) => (
+                  <div key={index} className="group bg-gray-800/50 hover:bg-cyan-500/10 rounded-2xl p-4 border border-gray-700 hover:border-cyan-500/30 transition-all duration-300">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0 w-16 h-12 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-lg flex items-center justify-center">
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-white group-hover:text-cyan-300 transition-colors text-sm leading-tight mb-1">
+                          {item.titulo}
+                        </h4>
+                        <p className="text-cyan-400 text-xs mb-2">{item.location_name}</p>
+                        <div className="flex items-center justify-between text-xs text-gray-400">
+                          <span>Visto el {new Date(item.fecha).toLocaleDateString('es-MX')}</span>
+                          <span>{new Date(item.fecha).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          {userHistory.length > 0 && (
+            <div className="p-6 bg-gray-900/50 border-t border-gray-700">
+              <div className="flex gap-3">
+                <button
+                  onClick={clearUserHistory}
+                  className="flex-1 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105"
+                >
+                  Limpiar Todo el Historial
+                </button>
+                <button
+                  onClick={() => setShowHistoryModal(false)}
+                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Modal de Ajustes Simplificado - Solo Historial
+  const SettingsModal = () => {
+    if (!showSettings) return null;
+
+    return (
+      <div className="modal-overlay fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="modal-content w-full max-w-md bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl shadow-2xl border border-cyan-500/20">
+          {/* Header */}
+          <div className="p-6 bg-gradient-to-r from-cyan-900/50 to-blue-900/50 border-b border-cyan-500/30 rounded-t-3xl">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+                Ajustes
+              </h2>
+              <button 
+                onClick={() => setShowSettings(false)}
+                className="text-cyan-400 hover:text-cyan-300 text-xl w-8 h-8 rounded-full hover:bg-cyan-400/10 transition-all duration-300 flex items-center justify-center"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+
+          {/* Content - Solo Historial */}
+          <div className="p-6">
+            <div className="space-y-4">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-cyan-500/10 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-cyan-300">Historial de Visualización</h3>
+                <p className="text-gray-400 text-sm mt-1">Gestiona tu historial de videos vistos</p>
+              </div>
+
+              <button 
+                onClick={async () => {
+                  await fetchUserHistory();
+                  setShowSettings(false);
+                  setShowHistoryModal(true);
+                }}
+                className="w-full group bg-gray-700/50 hover:bg-cyan-500/20 border border-gray-600 hover:border-cyan-500/50 rounded-xl p-4 transition-all duration-300 transform hover:scale-105"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-cyan-500/10 group-hover:bg-cyan-500/20 flex items-center justify-center transition-colors">
+                    <svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div className="text-left">
+                    <p className="font-semibold text-white group-hover:text-cyan-300">Ver Historial Completo</p>
+                    <p className="text-gray-400 text-sm">Explora todos los videos que has visto</p>
+                  </div>
+                </div>
+              </button>
+
+              <button 
+                onClick={() => {
+                  if (window.confirm('¿Estás seguro de que quieres limpiar todo tu historial? Esta acción no se puede deshacer.')) {
+                    clearUserHistory();
+                    setShowSettings(false);
+                  }
+                }}
+                className="w-full group bg-gray-700/50 hover:bg-red-500/20 border border-gray-600 hover:border-red-500/50 rounded-xl p-4 transition-all duration-300 transform hover:scale-105"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-red-500/10 group-hover:bg-red-500/20 flex items-center justify-center transition-colors">
+                    <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </div>
+                  <div className="text-left">
+                    <p className="font-semibold text-white group-hover:text-red-300">Limpiar Historial</p>
+                    <p className="text-gray-400 text-sm">Eliminar todos los registros de visualización</p>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex h-screen w-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 text-white overflow-hidden">
+      {/* Navbar */}
       <div className="navbar absolute top-0 left-0 w-full h-20 flex items-center justify-between px-8 z-50">
         <div className="flex items-center gap-8">
           <h1 className="text-3xl font-bold text-gradient bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
             VideoMap Pro
           </h1>
           
-          <form onSubmit={handleSearchSubmit} className="flex items-center relative" ref={searchInputRef}>
-            <div className="relative">
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Buscar ciudades, lugares..."
-                value={searchTerm}
-                onChange={handleSearchChange}
-                onFocus={() => searchTerm.length >= 2 && setShowSuggestions(true)}
-                className="search-input glass-effect bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 w-80"
-              />
-              
-              {showSuggestions && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-2xl z-50 max-h-60 overflow-y-auto">
-                  {loadingSuggestions ? (
-                    <div className="p-3 text-center text-gray-400">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-cyan-400 mx-auto"></div>
-                      <span className="ml-2">Buscando...</span>
-                    </div>
-                  ) : suggestions.length > 0 ? (
-                    suggestions.map((suggestion) => (
-                      <div
-                        key={suggestion.id}
-                        onClick={() => handleSuggestionClick(suggestion)}
-                        className="p-3 hover:bg-gray-700 cursor-pointer border-b border-gray-700 last:border-b-0 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="text-cyan-400">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                          </div>
-                          <span className="text-sm">{suggestion.name}</span>
-                        </div>
-                      </div>
-                    ))
-                  ) : searchTerm.length >= 2 ? (
-                    <div className="p-3 text-center text-gray-400 text-sm">
-                      No se encontraron sugerencias para "{searchTerm}"
-                    </div>
-                  ) : (
-                    <div>
-                      <div className="p-2 text-xs text-gray-400 border-b border-gray-700">
-                        Lugares populares en México
-                      </div>
-                      {popularSuggestions.map((suggestion, index) => (
-                        <div
-                          key={index}
-                          onClick={() => handleSuggestionClick({ name: suggestion })}
-                          className="p-3 hover:bg-gray-700 cursor-pointer border-b border-gray-700 last:border-b-0 transition-colors"
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className="text-cyan-400">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                              </svg>
-                            </div>
-                            <span className="text-sm">{suggestion}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+          <form onSubmit={handleSearchSubmit} className="flex items-center">
+            <input
+              type="text"
+              placeholder="Buscar ciudades, lugares..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              className="search-input glass-effect bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 w-80"
+            />
             
             <button 
               type="submit" 
@@ -983,6 +1048,10 @@ const MainApp = () => {
                 onClick={() => setShowSettings(true)}
                 className="btn-secondary flex items-center gap-2 bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg transition-all duration-300"
               >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
                 Ajustes
               </button>
               <div className="relative">
@@ -1005,38 +1074,50 @@ const MainApp = () => {
                 </button>
                 
                 {showProfile && (
-                  <div className="absolute right-0 top-16 w-64 glass-effect bg-gray-800 rounded-2xl shadow-2xl z-50 border border-gray-700">
-                    <div className="p-6 border-b border-white/10">
-                      <div className="flex items-center gap-3 mb-3">
+                  <div className="absolute right-0 top-16 w-80 glass-effect bg-gray-800/95 backdrop-blur-md rounded-2xl shadow-2xl z-50 border border-gray-600 overflow-hidden">
+                    <div className="p-6 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-900">
+                      <div className="flex items-center gap-4">
                         {user.foto ? (
                           <img 
                             src={user.foto} 
                             alt="Foto de perfil" 
-                            className="w-12 h-12 rounded-full object-cover border-2 border-cyan-500"
+                            className="w-14 h-14 rounded-full object-cover border-2 border-cyan-500 shadow-lg"
                           />
                         ) : (
-                          <div className="w-12 h-12 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold">
+                          <div className="w-14 h-14 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg">
                             {user.nombre.charAt(0).toUpperCase()}
                           </div>
                         )}
-                        <div>
-                          <p className="font-bold text-cyan-400">{user.nombre}</p>
-                          <p className="text-sm text-gray-300">{user.email}</p>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-cyan-400 text-lg truncate">{user.nombre}</p>
+                          <p className="text-gray-300 text-sm truncate">{user.email}</p>
                           {user.google_id && (
-                            <p className="text-xs text-green-400 mt-1">Cuenta Google</p>
+                            <div className="flex items-center gap-1 mt-1">
+                              <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                              </svg>
+                              <p className="text-xs text-green-400 font-medium">Cuenta Google</p>
+                            </div>
                           )}
                         </div>
                       </div>
                     </div>
-                    <div className="p-4">
+
+                    <div className="p-2">
                       <button 
                         onClick={() => {
                           setShowProfile(false);
                           setShowPhotoModal(true);
                         }}
-                        className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 transition flex items-center gap-2"
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 transition-all duration-200 text-gray-200 hover:text-white group"
                       >
-                        Cambiar Foto de Perfil
+                        <svg className="w-5 h-5 text-gray-400 group-hover:text-cyan-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span className="font-medium">Cambiar Foto de Perfil</span>
                       </button>
                       
                       {!user.google_id && (
@@ -1045,17 +1126,25 @@ const MainApp = () => {
                             setShowProfile(false);
                             setShowPasswordModal(true);
                           }}
-                          className="w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 transition flex items-center gap-2"
+                          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 transition-all duration-200 text-gray-200 hover:text-white group"
                         >
-                          Cambiar Contraseña
+                          <svg className="w-5 h-5 text-gray-400 group-hover:text-cyan-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                          </svg>
+                          <span className="font-medium">Cambiar Contraseña</span>
                         </button>
                       )}
                       
+                      <div className="border-t border-gray-700 my-2"></div>
+                      
                       <button 
                         onClick={handleLogout}
-                        className="w-full text-left px-4 py-3 rounded-xl hover:bg-red-500/20 text-red-400 transition flex items-center gap-2"
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-500/20 transition-all duration-200 text-red-400 hover:text-red-300 group"
                       >
-                        Cerrar Sesión
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        <span className="font-medium">Cerrar Sesión</span>
                       </button>
                     </div>
                   </div>
@@ -1073,6 +1162,7 @@ const MainApp = () => {
         </div>
       </div>
 
+      {/* Modales */}
       <AuthModal 
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
@@ -1092,51 +1182,12 @@ const MainApp = () => {
         onPhotoUpdate={handlePhotoUpdate}
       />
 
-      {showSettings && (
-        <div className="modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="modal-content max-w-md bg-gray-800 rounded-2xl p-6 border border-gray-700">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gradient bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
-                Ajustes
-              </h2>
-              <button 
-                onClick={() => setShowSettings(false)}
-                className="text-gray-400 hover:text-white text-2xl"
-              >
-                ×
-              </button>
-            </div>
+      <HistoryModal />
+      <SettingsModal />
 
-            <div className="space-y-6">
-              <div className="glass-effect bg-gray-700/50 rounded-xl p-4">
-                <h3 className="text-lg font-semibold mb-3">Historial</h3>
-                <div className="space-y-3">
-                  <button className="w-full text-left p-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition">
-                    Ver Historial de Videos Vistos
-                  </button>
-                  <button className="w-full text-left p-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition">
-                    Limpiar Historial Completo
-                  </button>
-                </div>
-              </div>
-
-              <div className="glass-effect bg-gray-700/50 rounded-xl p-4">
-                <h3 className="text-lg font-semibold mb-3">Datos</h3>
-                <div className="space-y-3">
-                  <button className="w-full text-left p-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition">
-                    Descargar Mis Datos
-                  </button>
-                  <button className="w-full text-left p-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition">
-                    Exportar Datos de la Cuenta
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
+      {/* Contenido Principal */}
       <div className="flex-1 flex pt-20">
+        {/* Mapa */}
         <div className="flex-1 relative">
           <Map
             {...viewport}
@@ -1148,38 +1199,42 @@ const MainApp = () => {
           >
             <NavigationControl position="top-right" />
 
-            {/* Popup para ubicación clickeada - MEJORADO */}
             {showLocationPopup && clickedLocation && (
               <Popup
                 latitude={clickedLocation.latitude}
                 longitude={clickedLocation.longitude}
-                closeButton={true}
+                closeButton={false}
                 closeOnClick={false}
                 onClose={() => setShowLocationPopup(false)}
                 anchor="top"
-                className="custom-popup"
+                className="rounded-xl shadow-2xl border border-gray-300 bg-white/95 backdrop-blur-md"
               >
-                <div className="p-4 min-w-64">
-                  <h3 className="font-bold text-lg mb-2 text-gray-800">
+                <div className="p-4 w-50 text-center text-gray-800">
+                  <h3 className="font-semibold text-lg mb-2 leading-snug">
                     {isValidLocation ? clickedLocationName : 'Ubicación no disponible'}
                   </h3>
-                  
+
                   {isValidLocation ? (
                     <>
-                      <p className="text-sm text-gray-600 mb-3">
-                        Coordenadas: {clickedLocation.latitude.toFixed(4)}, {clickedLocation.longitude.toFixed(4)}
+                      <p className="text-sm text-gray-600 mb-4">
+                        Coordenadas:
+                        <br />
+                        <span className="font-medium">
+                          {clickedLocation.latitude.toFixed(4)}, {clickedLocation.longitude.toFixed(4)}
+                        </span>
                       </p>
+
                       <div className="flex gap-2">
                         <button
                           onClick={searchVideosForClickedLocation}
                           disabled={loadingVideos}
-                          className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-3 rounded text-sm font-medium transition-colors disabled:opacity-50"
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium shadow-md transition-all duration-200 disabled:opacity-50"
                         >
                           {loadingVideos ? 'Buscando...' : 'Buscar Videos'}
                         </button>
                         <button
                           onClick={() => setShowLocationPopup(false)}
-                          className="bg-gray-500 hover:bg-gray-600 text-white py-2 px-3 rounded text-sm font-medium transition-colors"
+                          className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg text-sm font-medium shadow-md transition-all duration-200"
                         >
                           Cerrar
                         </button>
@@ -1187,27 +1242,22 @@ const MainApp = () => {
                     </>
                   ) : (
                     <>
-                      <p className="text-sm text-gray-600 mb-3">
-                        {clickedLocationName}
+                      <p className="text-sm text-gray-600 mb-3">{clickedLocationName}</p>
+                      <p className="text-xs text-gray-500 mb-4">
+                        Haz clic en ciudades o lugares con nombre específico en el mapa.
                       </p>
-                      <p className="text-xs text-gray-500 mb-3">
-                        Haz clic en ciudades, pueblos o áreas con nombre específico en el mapa.
-                      </p>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setShowLocationPopup(false)}
-                          className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 px-3 rounded text-sm font-medium transition-colors"
-                        >
-                          Entendido
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => setShowLocationPopup(false)}
+                        className="bg-gray-500 hover:bg-gray-600 text-white py-2 px-6 rounded-lg text-sm font-medium shadow-md transition-all duration-200"
+                      >
+                        Entendido
+                      </button>
                     </>
                   )}
                 </div>
               </Popup>
             )}
 
-            {/* Marcadores existentes... */}
             {userLocation && (
               <Marker latitude={userLocation.latitude} longitude={userLocation.longitude}>
                 <div className="relative">
@@ -1268,6 +1318,7 @@ const MainApp = () => {
           )}
         </div>
 
+        {/* Sidebar */}
         <div className="w-1/3 bg-gradient-to-b from-slate-900 via-purple-900 to-blue-900 overflow-y-auto p-6 flex flex-col">
           <div className="text-center mb-6">
             <h2 className="text-3xl font-bold bg-gradient-to-r from-yellow-400 via-red-400 to-pink-400 bg-clip-text text-transparent">
@@ -1396,25 +1447,6 @@ const MainApp = () => {
                     </div>
                   </div>
                 ))}
-                
-                {nextPageToken && (
-                  <div className="text-center mt-6">
-                    <button
-                      onClick={loadMoreVideos}
-                      disabled={loadingVideos}
-                      className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-3 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {loadingVideos ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
-                          Cargando...
-                        </span>
-                      ) : (
-                        'Mostrar más videos'
-                      )}
-                    </button>
-                  </div>
-                )}
               </>
             ) : (
               <div className="text-center py-8">
