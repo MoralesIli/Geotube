@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Map, { Marker, NavigationControl } from 'react-map-gl/mapbox';
+import Map, { Marker, NavigationControl, Popup } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import YouTube from 'react-youtube';
 import AuthModal from './AuthModal';
@@ -40,6 +40,12 @@ const MainApp = () => {
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const searchInputRef = useRef(null);
 
+  // ESTADOS PARA GEOLOCALIZACIÓN GLOBAL
+  const [clickedLocation, setClickedLocation] = useState(null);
+  const [clickedLocationName, setClickedLocationName] = useState('');
+  const [showLocationPopup, setShowLocationPopup] = useState(false);
+  const [isValidLocation, setIsValidLocation] = useState(false);
+
   const MAPBOX_TOKEN = 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
   const YOUTUBE_API_KEY = 'AIzaSyCi_KpytxXFwg6wCQKTYoCiVffiFRoGlsQ';
 
@@ -56,6 +62,171 @@ const MainApp = () => {
     'Mazatlán'
   ];
 
+  // Función mejorada para verificar si una ubicación es válida
+  const isValidMapLocation = async (lat, lng) => {
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?` +
+        `access_token=${MAPBOX_TOKEN}&` +
+        `types=country,region,place,locality,neighborhood&` +
+        `limit=1&` +
+        `language=es`
+      );
+      
+      if (!response.ok) return { isValid: false, placeName: null, featureType: 'unknown' };
+      
+      const data = await response.json();
+      
+      // Verificar si es una ubicación válida con nombre específico
+      if (data.features && data.features.length > 0) {
+        const feature = data.features[0];
+        const placeName = feature.place_name;
+        const featureType = feature.place_type?.[0] || 'unknown';
+        
+        // Solo aceptar tipos de ubicación específicos
+        const validTypes = ['country', 'region', 'place', 'locality', 'neighborhood'];
+        
+        if (!validTypes.includes(featureType)) {
+          return { isValid: false, placeName: null, featureType };
+        }
+        
+        // Excluir ubicaciones genéricas o sin nombre específico
+        const invalidPatterns = [
+          /unamed road/i,
+          /ocean/i,
+          /sea/i,
+          /pacific ocean/i,
+          /atlantic ocean/i,
+          /indian ocean/i,
+          /arctic ocean/i,
+          /null/i,
+          /undefined/i,
+          /^\s*$/, // nombre vacío
+          /mar/i, // mar
+          /gulf/i, // golfo
+          /bay/i, // bahía
+          /strait/i, // estrecho
+          /channel/i // canal
+        ];
+        
+        const hasValidName = !invalidPatterns.some(pattern => pattern.test(placeName)) && 
+                            placeName.trim().length > 0;
+        
+        const isValid = hasValidName && validTypes.includes(featureType);
+        
+        return {
+          isValid,
+          placeName: isValid ? placeName : null,
+          featureType
+        };
+      }
+      
+      return { isValid: false, placeName: null, featureType: 'unknown' };
+    } catch (error) {
+      console.error('Error verificando ubicación:', error);
+      return { isValid: false, placeName: null, featureType: 'unknown' };
+    }
+  };
+
+  // Manejar clic en el mapa - CORREGIDO
+  const handleMapClick = async (event) => {
+    const { lngLat } = event;
+    const clickedLat = lngLat.lat;
+    const clickedLng = lngLat.lng;
+    
+    // Verificar primero si las coordenadas están en áreas terrestres aproximadas
+    // Coordenadas aproximadas de los límites terrestres (excluyendo océanos)
+    const isInLandArea = 
+      clickedLat > -60 && clickedLat < 85 && // Excluir áreas polares extremas
+      clickedLng > -180 && clickedLng < 180;
+    
+    if (!isInLandArea) {
+      setIsValidLocation(false);
+      setClickedLocation({ latitude: clickedLat, longitude: clickedLng });
+      setClickedLocationName('Ubicación en océano o área no válida');
+      setShowLocationPopup(true);
+      return;
+    }
+    
+    setLoadingVideos(true);
+    
+    try {
+      // Verificar si es una ubicación válida con nombre específico
+      const locationCheck = await isValidMapLocation(clickedLat, clickedLng);
+      
+      if (locationCheck.isValid && locationCheck.placeName) {
+        setClickedLocation({ latitude: clickedLat, longitude: clickedLng });
+        setClickedLocationName(locationCheck.placeName);
+        setIsValidLocation(true);
+        setShowLocationPopup(true);
+        
+        // Mover el mapa a la ubicación clickeada
+        setTargetViewport({
+          latitude: clickedLat,
+          longitude: clickedLng,
+          zoom: 10
+        });
+      } else {
+        // Ubicación no válida (océano, área sin nombre, etc.)
+        setIsValidLocation(false);
+        setClickedLocation({ latitude: clickedLat, longitude: clickedLng });
+        
+        // Mensaje más específico según el tipo de ubicación
+        let message = 'Ubicación no disponible para búsqueda';
+        if (locationCheck.featureType === 'water' || locationCheck.featureType === 'marine') {
+          message = 'Área marina - No se pueden buscar videos aquí';
+        } else if (!locationCheck.placeName) {
+          message = 'Ubicación sin nombre específico';
+        }
+        
+        setClickedLocationName(message);
+        setShowLocationPopup(true);
+      }
+    } catch (error) {
+      console.error('Error procesando clic en mapa:', error);
+      setIsValidLocation(false);
+      setClickedLocation({ latitude: clickedLat, longitude: clickedLng });
+      setClickedLocationName('Error al obtener información de ubicación');
+      setShowLocationPopup(true);
+    } finally {
+      setLoadingVideos(false);
+    }
+  };
+
+  // Buscar videos para ubicación clickeada
+  const searchVideosForClickedLocation = async () => {
+    if (!clickedLocation || !isValidLocation) return;
+    
+    setLoadingVideos(true);
+    try {
+      const result = await searchYouTubeVideosByLocation(
+        clickedLocation.latitude,
+        clickedLocation.longitude,
+        clickedLocationName
+      );
+      
+      if (result.videos.length > 0) {
+        setVideos(result.videos);
+        setNextPageToken(result.nextPageToken);
+        setActiveFilter('clicked');
+        setSearchLocation({
+          latitude: clickedLocation.latitude,
+          longitude: clickedLocation.longitude,
+          name: clickedLocationName
+        });
+        setShowLocationPopup(false);
+      } else {
+        alert('No se encontraron videos para esta ubicación');
+      }
+    } catch (error) {
+      console.error('Error buscando videos:', error);
+      alert('Error al buscar videos para esta ubicación');
+    } finally {
+      setLoadingVideos(false);
+    }
+  };
+
+  // Resto del código permanece igual...
   useEffect(() => {
     const checkAuthStatus = () => {
       const token = localStorage.getItem('token');
@@ -356,6 +527,14 @@ const MainApp = () => {
           '',
           nextPageToken
         );
+      } else if (activeFilter === 'clicked' && clickedLocation) {
+        result = await searchYouTubeVideosByLocation(
+          clickedLocation.latitude,
+          clickedLocation.longitude,
+          clickedLocationName,
+          '',
+          nextPageToken
+        );
       } else {
         return;
       }
@@ -369,7 +548,7 @@ const MainApp = () => {
     } finally {
       setLoadingVideos(false);
     }
-  }, [nextPageToken, activeFilter, searchLocation, userLocation, userLocationName, searchTerm, searchYouTubeVideosByLocation]);
+  }, [nextPageToken, activeFilter, searchLocation, userLocation, userLocationName, searchTerm, clickedLocation, clickedLocationName, searchYouTubeVideosByLocation]);
 
   const fetchVideos = useCallback(async (query, pageToken = '') => {
     setLoadingVideos(true);
@@ -676,7 +855,8 @@ const MainApp = () => {
       other: 'Videos Cercanos', 
       current: 'Videos en tu Ubicación',
       search: `Resultados: "${searchTerm}"`,
-      mexico: 'Videos Populares de México'
+      mexico: 'Videos Populares de México',
+      clicked: `Videos en ${clickedLocationName}`
     };
     return titles[activeFilter] || 'Videos con Vista Previa';
   };
@@ -687,7 +867,8 @@ const MainApp = () => {
       other: userLocationName ? `Videos cercanos a ${userLocationName}` : 'Videos en tu región',
       current: userLocationName ? `Basado en tu ubicación: ${userLocationName}` : 'Basado en tu ubicación actual',
       search: searchLocation ? `Ubicación: ${searchLocation.name}` : `Búsqueda: "${searchTerm}"`,
-      mexico: 'Los videos más populares en México'
+      mexico: 'Los videos más populares en México',
+      clicked: `Ubicación seleccionada: ${clickedLocationName}`
     };
     return subtitles[activeFilter] || 'Explorando contenido local';
   };
@@ -961,11 +1142,72 @@ const MainApp = () => {
             {...viewport}
             style={{ width: '100%', height: '100%' }}
             onMove={(evt) => !isAnimating && setViewport(evt.viewState)}
+            onClick={handleMapClick}
             mapboxAccessToken={MAPBOX_TOKEN}
             mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
           >
             <NavigationControl position="top-right" />
 
+            {/* Popup para ubicación clickeada - MEJORADO */}
+            {showLocationPopup && clickedLocation && (
+              <Popup
+                latitude={clickedLocation.latitude}
+                longitude={clickedLocation.longitude}
+                closeButton={true}
+                closeOnClick={false}
+                onClose={() => setShowLocationPopup(false)}
+                anchor="top"
+                className="custom-popup"
+              >
+                <div className="p-4 min-w-64">
+                  <h3 className="font-bold text-lg mb-2 text-gray-800">
+                    {isValidLocation ? clickedLocationName : 'Ubicación no disponible'}
+                  </h3>
+                  
+                  {isValidLocation ? (
+                    <>
+                      <p className="text-sm text-gray-600 mb-3">
+                        Coordenadas: {clickedLocation.latitude.toFixed(4)}, {clickedLocation.longitude.toFixed(4)}
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={searchVideosForClickedLocation}
+                          disabled={loadingVideos}
+                          className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-3 rounded text-sm font-medium transition-colors disabled:opacity-50"
+                        >
+                          {loadingVideos ? 'Buscando...' : 'Buscar Videos'}
+                        </button>
+                        <button
+                          onClick={() => setShowLocationPopup(false)}
+                          className="bg-gray-500 hover:bg-gray-600 text-white py-2 px-3 rounded text-sm font-medium transition-colors"
+                        >
+                          Cerrar
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-gray-600 mb-3">
+                        {clickedLocationName}
+                      </p>
+                      <p className="text-xs text-gray-500 mb-3">
+                        Haz clic en ciudades, pueblos o áreas con nombre específico en el mapa.
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setShowLocationPopup(false)}
+                          className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 px-3 rounded text-sm font-medium transition-colors"
+                        >
+                          Entendido
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </Popup>
+            )}
+
+            {/* Marcadores existentes... */}
             {userLocation && (
               <Marker latitude={userLocation.latitude} longitude={userLocation.longitude}>
                 <div className="relative">
@@ -1013,7 +1255,7 @@ const MainApp = () => {
             disabled={isAnimating}
             className="absolute bottom-6 right-6 btn-success bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white text-lg font-bold px-6 py-3 rounded-2xl shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
           >
-            {isAnimating ? 'Moviendo...' : 'Mi Ubicación'}
+            {isAnimating ? 'Moviendo...' : 'Mi Ubicación Actual'}
           </button>
 
           {isAnimating && (
@@ -1029,10 +1271,10 @@ const MainApp = () => {
         <div className="w-1/3 bg-gradient-to-b from-slate-900 via-purple-900 to-blue-900 overflow-y-auto p-6 flex flex-col">
           <div className="text-center mb-6">
             <h2 className="text-3xl font-bold bg-gradient-to-r from-yellow-400 via-red-400 to-pink-400 bg-clip-text text-transparent">
-              {getSidebarTitle()}
+              {activeFilter === 'clicked' ? `Videos en ${clickedLocationName}` : getSidebarTitle()}
             </h2>
             <p className="text-cyan-300 text-sm mt-2">
-              {getSidebarSubtitle()}
+              {activeFilter === 'clicked' ? `Ubicación seleccionada: ${clickedLocationName}` : getSidebarSubtitle()}
             </p>
           </div>
 
