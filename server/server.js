@@ -23,7 +23,7 @@ db.connect((err) => {
     console.error('Error connecting to MySQL:', err.stack);
     return;
   }
-  console.log('✅ Connected to MySQL as id ' + db.threadId);
+  console.log('Connected to MySQL as id ' + db.threadId);
 });
 
 // Middleware para habilitar CORS y JSON
@@ -87,8 +87,7 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(400).json({ error: 'El usuario ya existe' });
     }
 
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const [result] = await db.promise().execute(
       'INSERT INTO usuarios (nombre, email, password) VALUES (?, ?, ?)',
@@ -96,7 +95,7 @@ app.post('/api/auth/register', async (req, res) => {
     );
 
     const token = jwt.sign(
-      { id: result.insertId, email: email },
+      { id: result.insertId, email },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -136,8 +135,8 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const user = users[0];
-
     const validPassword = await bcrypt.compare(password, user.password);
+    
     if (!validPassword) {
       return res.status(400).json({ error: 'Credenciales inválidas' });
     }
@@ -216,11 +215,7 @@ app.post('/api/auth/google', async (req, res) => {
     }
 
     const jwtToken = jwt.sign(
-      { 
-        id: user.id, 
-        email: user.email,
-        googleId: googleId 
-      },
+      { id: user.id, email: user.email },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -238,17 +233,14 @@ app.post('/api/auth/google', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error en autenticación con Google:', error);
-    res.status(500).json({ error: 'Error en autenticación con Google: ' + error.message });
+    console.error('Error en autenticación con Google:', error);
+    res.status(500).json({ error: 'Error en autenticación con Google' });
   }
 });
 
 // Verificar token
 app.get('/api/auth/verify', authenticateToken, (req, res) => {
-  res.json({ 
-    valid: true, 
-    user: req.user 
-  });
+  res.json({ valid: true, user: req.user });
 });
 
 // Obtener perfil de usuario
@@ -285,14 +277,14 @@ app.get('/api/auth/profile', authenticateToken, async (req, res) => {
 
 // ==================== RUTAS DE HISTORIAL ====================
 
-// Registrar acceso a video - VERSIÓN CORREGIDA
+// Registrar acceso a video
 app.post('/api/register-video-access', authenticateToken, async (req, res) => {
   const { youtube_video_id, titulo, location_name, latitude, longitude, duracion_reproduccion = 0 } = req.body;
 
   try {
-    console.log('🎬 Registrando acceso a video para usuario:', req.user.id);
-    console.log('📹 Video ID:', youtube_video_id);
-    console.log('📍 Ubicación:', location_name);
+    console.log('Registrando acceso a video para usuario:', req.user.id);
+    console.log('Video ID:', youtube_video_id);
+    console.log('Ubicación:', location_name);
 
     // Buscar si el video ya existe
     let [videos] = await db.promise().execute(
@@ -303,20 +295,19 @@ app.post('/api/register-video-access', authenticateToken, async (req, res) => {
     let videoId;
     
     if (videos.length === 0) {
-      // Insertar nuevo video
-      console.log('➕ Creando nuevo video en BD');
+      console.log('Creando nuevo video en BD');
       const [result] = await db.promise().execute(
         'INSERT INTO videos (youtube_video_id, location_name, latitude, longitude, titulo) VALUES (?, ?, ?, ?, ?)',
         [youtube_video_id, location_name, latitude, longitude, titulo || 'Video de YouTube']
       );
       videoId = result.insertId;
-      console.log('✅ Video creado con ID:', videoId);
+      console.log('Video creado con ID:', videoId);
     } else {
       videoId = videos[0].id;
-      console.log('📹 Video existente, ID:', videoId);
+      console.log('Video existente, ID:', videoId);
     }
 
-    // Registrar el acceso directamente (sin usar el procedimiento almacenado)
+    // Registrar el acceso
     const ip_origen = req.ip || req.connection.remoteAddress;
     const user_agent = req.get('User-Agent') || 'Unknown';
     
@@ -325,7 +316,7 @@ app.post('/api/register-video-access', authenticateToken, async (req, res) => {
       [req.user.id, videoId, ip_origen, user_agent, duracion_reproduccion]
     );
 
-    console.log('✅ Acceso registrado exitosamente. ID de acceso:', accessResult.insertId);
+    console.log('Acceso registrado exitosamente. ID de acceso:', accessResult.insertId);
 
     // Actualizar contador de vistas del video
     await db.promise().execute(
@@ -333,7 +324,7 @@ app.post('/api/register-video-access', authenticateToken, async (req, res) => {
       [videoId]
     );
 
-    console.log('✅ Contador de vistas actualizado');
+    console.log('Contador de vistas actualizado');
 
     res.json({ 
       success: true, 
@@ -343,11 +334,8 @@ app.post('/api/register-video-access', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error registrando acceso:', error);
-    res.status(500).json({ 
-      error: 'Error interno del servidor',
-      details: error.message 
-    });
+    console.error('Error registrando acceso:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
 
@@ -356,9 +344,8 @@ app.get('/api/user-history/:userId', authenticateToken, async (req, res) => {
   const { userId } = req.params;
 
   try {
-    console.log('📚 Solicitando historial para usuario:', userId);
+    console.log('Solicitando historial para usuario:', userId);
 
-    // Verificar que el usuario solo pueda ver su propio historial
     if (parseInt(userId) !== req.user.id) {
       return res.status(403).json({ error: 'No autorizado' });
     }
@@ -380,12 +367,12 @@ app.get('/api/user-history/:userId', authenticateToken, async (req, res) => {
       LIMIT 50
     `, [userId]);
 
-    console.log('✅ Historial obtenido. Registros encontrados:', history.length);
+    console.log('Historial obtenido. Registros encontrados:', history.length);
     
     res.json(history);
 
   } catch (error) {
-    console.error('❌ Error obteniendo historial:', error);
+    console.error('Error obteniendo historial:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
@@ -399,14 +386,14 @@ app.delete('/api/clear-history/:userId', authenticateToken, async (req, res) => 
       return res.status(403).json({ error: 'No autorizado' });
     }
 
-    console.log('🗑️ Limpiando historial para usuario:', userId);
+    console.log('Limpiando historial para usuario:', userId);
 
     const [result] = await db.promise().execute(
       'DELETE FROM accesos WHERE usuario_id = ?',
       [userId]
     );
 
-    console.log('✅ Historial limpiado. Registros eliminados:', result.affectedRows);
+    console.log('Historial limpiado. Registros eliminados:', result.affectedRows);
     
     res.json({ 
       success: true, 
@@ -415,7 +402,7 @@ app.delete('/api/clear-history/:userId', authenticateToken, async (req, res) => 
     });
 
   } catch (error) {
-    console.error('❌ Error limpiando historial:', error);
+    console.error('Error limpiando historial:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
@@ -437,7 +424,7 @@ const searchYouTubeVideos = async (lat, lng, query) => {
     });
     return response.data.items;
   } catch (error) {
-    console.error('Error searching YouTube videos:', error.response ? error.response.data : error.message);
+    console.error('Error searching YouTube videos:', error.response?.data || error.message);
     return null;
   }
 };
@@ -452,6 +439,7 @@ const geocodeLocation = async (query) => {
         language: 'es',
       },
     });
+    
     if (response.data.features.length > 0) {
       const feature = response.data.features[0];
       const [longitude, latitude] = feature.center;
@@ -463,7 +451,7 @@ const geocodeLocation = async (query) => {
     }
     return null;
   } catch (error) {
-    console.error('Error geocoding location:', error.response ? error.response.data : error.message);
+    console.error('Error geocoding location:', error.response?.data || error.message);
     return null;
   }
 };
@@ -471,83 +459,83 @@ const geocodeLocation = async (query) => {
 // Endpoint para buscar y guardar videos por nombre de ubicación
 app.get('/api/search', async (req, res) => {
   const { q } = req.query;
+  
   if (!q) {
     return res.status(400).json({ error: 'Falta el término de búsqueda.' });
   }
 
-  const location = await geocodeLocation(q);
-  if (!location) {
-    return res.status(404).json({ error: 'No se pudo encontrar la ubicación en México.' });
-  }
-
-  const youtubeVideos = await searchYouTubeVideos(location.latitude, location.longitude, q);
-  if (!youtubeVideos || youtubeVideos.length === 0) {
-    return res.status(404).json({ error: 'No se encontraron videos de YouTube para esta ubicación.' });
-  }
-
-  const videoIds = youtubeVideos.map(item => item.id.videoId);
-  const insertPromises = videoIds.map(videoId => {
-    return new Promise((resolve, reject) => {
-      const sql = "INSERT INTO videos (location_name, latitude, longitude, youtube_video_id) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE location_name = VALUES(location_name)";
-      db.query(sql, [location.location_name, location.latitude, location.longitude, videoId], (err, result) => {
-        if (err) {
-          console.error('Error inserting video:', err);
-          reject(err);
-        } else {
-          resolve(result);
-        }
-      });
-    });
-  });
-
   try {
+    const location = await geocodeLocation(q);
+    if (!location) {
+      return res.status(404).json({ error: 'No se pudo encontrar la ubicación en México.' });
+    }
+
+    const youtubeVideos = await searchYouTubeVideos(location.latitude, location.longitude, q);
+    if (!youtubeVideos || youtubeVideos.length === 0) {
+      return res.status(404).json({ error: 'No se encontraron videos de YouTube para esta ubicación.' });
+    }
+
+    const videoIds = youtubeVideos.map(item => item.id.videoId);
+    const insertPromises = videoIds.map(videoId => {
+      return db.promise().execute(
+        "INSERT INTO videos (location_name, latitude, longitude, youtube_video_id) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE location_name = VALUES(location_name)",
+        [location.location_name, location.latitude, location.longitude, videoId]
+      );
+    });
+
     await Promise.all(insertPromises);
+    
     const savedVideos = videoIds.map(videoId => ({
       location_name: location.location_name,
       latitude: location.latitude,
       longitude: location.longitude,
       youtube_video_id: videoId,
     }));
+    
     res.json(savedVideos);
+
   } catch (error) {
-    res.status(500).json({ error: 'Error saving videos to database.' });
+    console.error('Error en búsqueda:', error);
+    res.status(500).json({ error: 'Error procesando la búsqueda.' });
   }
 });
 
 // Endpoint: buscar videos cerca de coordenadas
 app.get('/api/searchByCoords', async (req, res) => {
   const { lat, lng } = req.query;
+  
   if (!lat || !lng) {
     return res.status(400).json({ error: 'Faltan coordenadas (lat, lng).' });
   }
 
-  const youtubeVideos = await searchYouTubeVideos(lat, lng, 'México');
-  if (!youtubeVideos || youtubeVideos.length === 0) {
-    return res.status(404).json({ error: 'No se encontraron videos en esta ubicación.' });
-  }
-
-  const videoIds = youtubeVideos.map(item => item.id.videoId);
-  const insertPromises = videoIds.map(videoId => {
-    return new Promise((resolve, reject) => {
-      const sql = "INSERT INTO videos (location_name, latitude, longitude, youtube_video_id) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE location_name = VALUES(location_name)";
-      db.query(sql, [`Ubicación actual`, lat, lng, videoId], (err, result) => {
-        if (err) reject(err);
-        else resolve(result);
-      });
-    });
-  });
-
   try {
+    const youtubeVideos = await searchYouTubeVideos(lat, lng, 'México');
+    if (!youtubeVideos || youtubeVideos.length === 0) {
+      return res.status(404).json({ error: 'No se encontraron videos en esta ubicación.' });
+    }
+
+    const videoIds = youtubeVideos.map(item => item.id.videoId);
+    const insertPromises = videoIds.map(videoId => {
+      return db.promise().execute(
+        "INSERT INTO videos (location_name, latitude, longitude, youtube_video_id) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE location_name = VALUES(location_name)",
+        ['Ubicación actual', lat, lng, videoId]
+      );
+    });
+
     await Promise.all(insertPromises);
+    
     const savedVideos = videoIds.map(videoId => ({
       location_name: "Ubicación actual",
       latitude: parseFloat(lat),
       longitude: parseFloat(lng),
       youtube_video_id: videoId,
     }));
+    
     res.json(savedVideos);
+
   } catch (error) {
-    res.status(500).json({ error: 'Error guardando videos en la base de datos.' });
+    console.error('Error en búsqueda por coordenadas:', error);
+    res.status(500).json({ error: 'Error procesando la búsqueda.' });
   }
 });
 
@@ -556,7 +544,6 @@ app.get('/api/video/:videoId', async (req, res) => {
   try {
     const { videoId } = req.params;
 
-    // Obtener información del video
     const [videoRows] = await db.promise().execute(
       `SELECT v.*, 
               COUNT(a.id) as total_views,
@@ -574,7 +561,6 @@ app.get('/api/video/:videoId', async (req, res) => {
 
     const video = videoRows[0];
 
-    // Obtener videos relacionados (misma ubicación)
     const [relatedRows] = await db.promise().execute(
       `SELECT v.*, 
               COUNT(a.id) as view_count
@@ -620,28 +606,20 @@ app.use((req, res) => {
   res.status(404).json({ 
     error: 'Ruta no encontrada',
     path: req.path,
-    method: req.method,
-    message: 'La ruta solicitada no existe en el servidor'
+    method: req.method
   });
 });
 
 // Manejo de errores global
 app.use((error, req, res, next) => {
-  console.error('❌ Error global:', error);
-  res.status(500).json({ 
-    error: 'Error interno del servidor',
-    message: error.message
-  });
+  console.error('Error global:', error);
+  res.status(500).json({ error: 'Error interno del servidor' });
 });
 
 // Iniciar el servidor
 app.listen(port, () => {
-  console.log(`   Servidor corriendo en http://localhost:${port}`);
-  console.log(`   API disponible en http://localhost:${port}/api`);
-  console.log(`   Rutas de autenticación en http://localhost:${port}/api/auth`);
-  console.log(`   Salud del servidor: http://localhost:${port}/api/health`);
-  console.log(`   Rutas de historial:`);
-  console.log(`   POST /api/register-video-access (PROTEGIDA)`);
-  console.log(`   GET  /api/user-history/:userId (PROTEGIDA)`);
-  console.log(`   DELETE /api/clear-history/:userId (PROTEGIDA)`);
+  console.log(`Servidor corriendo en http://localhost:${port}`);
+  console.log(`API disponible en http://localhost:${port}/api`);
+  console.log(`Rutas de autenticación en http://localhost:${port}/api/auth`);
+  console.log(`Salud del servidor: http://localhost:${port}/api/health`);
 });
