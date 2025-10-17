@@ -42,6 +42,11 @@ const MainApp = () => {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [userHistory, setUserHistory] = useState([]);
 
+  // Estados para región y disponibilidad
+  const [currentRegion, setCurrentRegion] = useState('MX');
+  const [youtubeAvailable, setYoutubeAvailable] = useState(true);
+  const [youtubeError, setYoutubeError] = useState('');
+
   // Referencias
   const animationRef = useRef();
   const startViewportRef = useRef(null);
@@ -52,18 +57,159 @@ const MainApp = () => {
   const MAPBOX_TOKEN = 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
   const YOUTUBE_API_KEY = 'AIzaSyCi_KpytxXFwg6wCQKTYoCiVffiFRoGlsQ';
 
-  const popularSuggestions = [
-    'Ciudad de México',
-    'Cancún',
-    'Guadalajara',
-    'Monterrey',
-    'Playa del Carmen',
-    'Tulum',
-    'Oaxaca',
-    'Puerto Vallarta',
-    'Los Cabos',
-    'Mazatlán'
+  // 🔒 PAÍSES Y CIUDADES RESTRINGIDAS
+  const restrictedCountries = ['KP', 'IR', 'SY', 'SS', 'CU', 'CN', 'TM', 'UZ', 'TJ', 'ER', 'SD'];
+  const restrictedCities = [
+    'pyongyang', 'corea del norte', 'north korea', 
+    'teherán', 'tehran', 'iran', 'irán',
+    'damasco', 'damascus', 'siria', 'syria',
+    'juba', 'sudán del sur', 'south sudan',
+    'la habana', 'havana', 'cuba',
+    'beijing', 'pekín', 'shanghai', 'cantón', 'guangzhou', 'shenzhen', 'china',
+    'ashgabat', 'asjabad', 'turkmenistán', 'turkmenistan',
+    'tashkent', 'taskent', 'uzbekistán', 'uzbekistan',
+    'dushanbe', 'tayikistán', 'tajikistan',
+    'asmara', 'eritrea',
+    'jartum', 'khartoum', 'sudán', 'sudan'
   ];
+
+  // Configuración por región
+  const regionConfig = {
+    'MX': { 
+      code: 'MX', 
+      name: 'México',
+      center: [23.6345, -102.5528],
+      popularQueries: ['México', 'CDMX', 'Cancún', 'Guadalajara', 'Monterrey']
+    },
+    'US': { 
+      code: 'US', 
+      name: 'Estados Unidos',
+      center: [39.8283, -98.5795],
+      popularQueries: ['USA', 'New York', 'Los Angeles', 'Chicago', 'Miami']
+    },
+    'ES': { 
+      code: 'ES', 
+      name: 'España',
+      center: [40.4637, -3.7492],
+      popularQueries: ['España', 'Madrid', 'Barcelona', 'Valencia', 'Sevilla']
+    },
+    'CN': { 
+      code: 'CN', 
+      name: 'China',
+      center: [35.8617, 104.1954],
+      popularQueries: ['China', 'Beijing', 'Shanghai', 'Guangzhou', 'Shenzhen']
+    },
+    'RU': { 
+      code: 'RU', 
+      name: 'Rusia',
+      center: [61.5240, 105.3188],
+      popularQueries: ['Rusia', 'Moscú', 'San Petersburgo', 'Novosibirsk', 'Ekaterimburgo']
+    }
+  };
+
+  // 🔒 FUNCIÓN PARA VERIFICAR RESTRICCIONES
+  const checkRestrictions = (query, locationData = null) => {
+    const restrictedPatterns = new RegExp(
+      restrictedCities.map(city => city.toLowerCase()).join('|'), 
+      'i'
+    );
+    
+    if (restrictedPatterns.test(query.toLowerCase())) {
+      return {
+        restricted: true,
+        reason: 'query',
+        message: ' Videos no disponibles en esta región (restricción de YouTube).'
+      };
+    }
+
+    if (locationData && locationData.countryCode) {
+      if (restrictedCountries.includes(locationData.countryCode.toUpperCase())) {
+        return {
+          restricted: true,
+          reason: 'country',
+          message: '⚠️ YouTube no está disponible en este país (restricción gubernamental).'
+        };
+      }
+    }
+
+    return { restricted: false };
+  };
+
+  // Función para detectar región del usuario
+  const detectUserRegion = async () => {
+    try {
+      if (navigator.geolocation) {
+        return new Promise((resolve) => {
+          navigator.geolocation.getCurrentPosition(
+            async (position) => {
+              const { latitude, longitude } = position.coords;
+              try {
+                const response = await fetch(
+                  `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?` +
+                  `access_token=${MAPBOX_TOKEN}&types=country&limit=1`
+                );
+                if (response.ok) {
+                  const data = await response.json();
+                  if (data.features?.[0]) {
+                    const countryCode = data.features[0].properties.short_code?.toUpperCase();
+                    
+                    if (countryCode && restrictedCountries.includes(countryCode)) {
+                      setYoutubeAvailable(false);
+                      setYoutubeError('YouTube no está disponible en tu país debido a restricciones gubernamentales.');
+                      resolve(countryCode);
+                      return;
+                    }
+                    
+                    if (countryCode && regionConfig[countryCode]) {
+                      resolve(countryCode);
+                      return;
+                    }
+                  }
+                }
+              } catch (error) {
+                console.warn('Error detectando región:', error);
+              }
+              resolve('MX');
+            },
+            () => resolve('MX'),
+            { timeout: 5000 }
+          );
+        });
+      }
+    } catch (error) {
+      console.warn('Error en detección de región:', error);
+    }
+    return 'MX';
+  };
+
+  // Función para verificar disponibilidad de YouTube
+  const checkYouTubeAvailability = async () => {
+    try {
+      const response = await fetch(
+        `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=dQw4w9WgXcQ&key=${YOUTUBE_API_KEY}`,
+        { 
+          method: 'GET',
+          signal: AbortSignal.timeout(10000)
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        setYoutubeAvailable(true);
+        setYoutubeError('');
+        return true;
+      } else {
+        setYoutubeAvailable(false);
+        setYoutubeError('YouTube no está disponible en tu región');
+        return false;
+      }
+    } catch (error) {
+      console.warn('YouTube no disponible en esta región:', error);
+      setYoutubeAvailable(false);
+      setYoutubeError('No se puede acceder a YouTube en tu país');
+      return false;
+    }
+  };
 
   // Función para registrar acceso a video
   const registerVideoAccess = async (video) => {
@@ -157,6 +303,16 @@ const MainApp = () => {
         const feature = data.features[0];
         const placeName = feature.place_name;
         const featureType = feature.place_type?.[0] || 'unknown';
+        const countryCode = feature.properties.short_code?.toUpperCase();
+        
+        if (countryCode && restrictedCountries.includes(countryCode)) {
+          return { 
+            isValid: false, 
+            placeName: 'Ubicación en país restringido', 
+            featureType: 'restricted',
+            countryCode 
+          };
+        }
         
         const validTypes = ['country', 'region', 'place', 'locality', 'neighborhood'];
         
@@ -190,7 +346,8 @@ const MainApp = () => {
         return {
           isValid,
           placeName: isValid ? placeName : null,
-          featureType
+          featureType,
+          countryCode
         };
       }
       
@@ -242,6 +399,8 @@ const MainApp = () => {
         let message = 'Ubicación no disponible para búsqueda';
         if (locationCheck.featureType === 'water' || locationCheck.featureType === 'marine') {
           message = 'Área marina - No se pueden buscar videos aquí';
+        } else if (locationCheck.featureType === 'restricted') {
+          message = 'País restringido - YouTube no disponible';
         } else if (!locationCheck.placeName) {
           message = 'Ubicación sin nombre específico';
         }
@@ -295,22 +454,52 @@ const MainApp = () => {
 
   // Efectos principales
   useEffect(() => {
-    const checkAuthStatus = async () => {
-      const token = localStorage.getItem('token');
-      const userData = localStorage.getItem('user');
-      
-      if (token && userData) {
-        try {
-          const user = JSON.parse(userData);
-          setUser(user);
-        } catch (error) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
+    const initializeApp = async () => {
+      const checkAuthStatus = async () => {
+        const token = localStorage.getItem('token');
+        const userData = localStorage.getItem('user');
+        
+        if (token && userData) {
+          try {
+            const user = JSON.parse(userData);
+            setUser(user);
+          } catch (error) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+          }
         }
+      };
+
+      const region = await detectUserRegion();
+      setCurrentRegion(region);
+      
+      const youtubeAvailable = await checkYouTubeAvailability();
+      setYoutubeAvailable(youtubeAvailable);
+
+      await checkAuthStatus();
+
+      if (youtubeAvailable) {
+        const savedLocation = localStorage.getItem('userLocation');
+        if (savedLocation) {
+          try {
+            const locationData = JSON.parse(savedLocation);
+            setUserLocation({ latitude: locationData.latitude, longitude: locationData.longitude });
+            setUserLocationName(locationData.name || 'Ubicación guardada');
+            await loadVideosForLocation(locationData.latitude, locationData.longitude, locationData.name);
+          } catch (error) {
+            console.error('Error:', error);
+            await fetchPopularVideosByRegion(region);
+          }
+        } else {
+          await fetchPopularVideosByRegion(region);
+        }
+      } else {
+        setVideos([]);
+        setActiveFilter('unavailable');
       }
     };
 
-    checkAuthStatus();
+    initializeApp();
   }, []);
 
   useEffect(() => {
@@ -367,7 +556,9 @@ const MainApp = () => {
       if (data.features?.[0]) {
         const [longitude, latitude] = data.features[0].center;
         const locationName = data.features[0].place_name;
-        return { latitude, longitude, locationName };
+        const countryCode = data.features[0].properties.short_code?.toUpperCase();
+        
+        return { latitude, longitude, locationName, countryCode };
       }
       
       throw new Error('Lugar no encontrado');
@@ -404,6 +595,10 @@ const MainApp = () => {
       const searchQuery = query || locationName.split(',')[0].trim();
       let url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=12&relevanceLanguage=es&q=${encodeURIComponent(searchQuery)}&key=${YOUTUBE_API_KEY}`;
 
+      if (currentRegion) {
+        url += `&regionCode=${currentRegion}`;
+      }
+
       if (pageToken) {
         url += `&pageToken=${pageToken}`;
       }
@@ -411,14 +606,21 @@ const MainApp = () => {
       const searchResponse = await fetch(url);
 
       if (!searchResponse.ok) {
-        if (searchResponse.status === 403) throw new Error('QUOTA_EXCEEDED');
+        if (searchResponse.status === 403) {
+          setYoutubeAvailable(false);
+          setYoutubeError('Límite de cuota excedido para YouTube API');
+          throw new Error('QUOTA_EXCEEDED');
+        }
         throw new Error('Error en YouTube API');
       }
 
       const searchData = await searchResponse.json();
       
       if (!searchData.items?.length) {
-        return { videos: [], nextPageToken: '' };
+        return {
+          videos: [],
+          nextPageToken: ''
+        };
       }
 
       const youtubeVideos = searchData.items.slice(0, 12).map((item) => {
@@ -452,13 +654,16 @@ const MainApp = () => {
 
     } catch (error) {
       console.error('Error buscando videos:', error);
-      if (error.message === 'QUOTA_EXCEEDED') throw error;
+      if (error.message === 'QUOTA_EXCEEDED') {
+        setYoutubeAvailable(false);
+        throw error;
+      }
       throw new Error('Error en búsqueda de videos');
     }
-  }, [YOUTUBE_API_KEY]);
+  }, [YOUTUBE_API_KEY, currentRegion]);
 
-  // Función para videos populares de México
-  const fetchPopularMexicoVideos = useCallback(async () => {
+  // Función para videos populares por región
+  const fetchPopularVideosByRegion = useCallback(async (region = 'MX') => {
     try {
       const lastQuotaError = localStorage.getItem('youtube_quota_exceeded');
       if (lastQuotaError && Date.now() - parseInt(lastQuotaError) < 3600000) {
@@ -466,18 +671,18 @@ const MainApp = () => {
       }
 
       const response = await fetch(
-        `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&chart=mostPopular&regionCode=MX&maxResults=12&key=${YOUTUBE_API_KEY}`
+        `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&chart=mostPopular&regionCode=${region}&maxResults=12&key=${YOUTUBE_API_KEY}`
       );
 
       if (response.ok) {
         const data = await response.json();
         const popularVideos = data.items.map((item) => ({
           youtube_video_id: item.id,
-          location_name: `México - ${item.snippet.channelTitle}`,
+          location_name: `${regionConfig[region]?.name || 'México'} - ${item.snippet.channelTitle}`,
           title: item.snippet.title,
           channelTitle: item.snippet.channelTitle,
-          latitude: 19.4326 + (Math.random() - 0.5) * 4,
-          longitude: -99.1332 + (Math.random() - 0.5) * 4,
+          latitude: (regionConfig[region]?.center[0] || 23.6345) + (Math.random() - 0.5) * 4,
+          longitude: (regionConfig[region]?.center[1] || -102.5528) + (Math.random() - 0.5) * 4,
           views: parseInt(item.statistics.viewCount) || Math.floor(Math.random() * 50000) + 10000,
           likes: parseInt(item.statistics.likeCount) || 0,
           duration: item.contentDetails?.duration || 'PT0S',
@@ -494,32 +699,17 @@ const MainApp = () => {
       } else {
         if (response.status === 403) {
           localStorage.setItem('youtube_quota_exceeded', Date.now().toString());
+          setYoutubeAvailable(false);
+          setYoutubeError('Límite de cuota excedido para YouTube API');
           throw new Error('QUOTA_EXCEEDED');
         }
         throw new Error('Error al cargar videos populares');
       }
     } catch (error) {
       console.error('Error:', error);
-      const fallbackVideos = [
-        {
-          youtube_video_id: 'dQw4w9WgXcQ',
-          location_name: 'México - Video Popular',
-          title: 'Video Musical Popular',
-          channelTitle: 'Canal Musical',
-          latitude: 19.4326,
-          longitude: -99.1332,
-          views: 1500000,
-          likes: 50000,
-          duration: 'PT3M33S',
-          isCurrentLocation: false,
-          isSearchResult: false,
-          thumbnail: 'https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg'
-        }
-      ];
-      setVideos(fallbackVideos);
-      setActiveFilter('mexico');
-      setNextPageToken('');
-      return fallbackVideos;
+      setVideos([]);
+      setActiveFilter('unavailable');
+      return [];
     }
   }, [YOUTUBE_API_KEY]);
 
@@ -536,21 +726,26 @@ const MainApp = () => {
         setActiveFilter(isSearch ? 'search' : 'current');
         setSearchLocation(isSearch ? { latitude, longitude, name: locationName } : null);
       } else {
-        await fetchPopularMexicoVideos();
+        await fetchPopularVideosByRegion(currentRegion);
       }
     } catch (err) {
       console.error('Error buscando videos:', err);
-      await fetchPopularMexicoVideos();
+      if (err.message === 'QUOTA_EXCEEDED') {
+        setVideos([]);
+        setActiveFilter('unavailable');
+      } else {
+        await fetchPopularVideosByRegion(currentRegion);
+      }
     } finally {
       setLoadingVideos(false);
     }
-  }, [searchYouTubeVideosByLocation, fetchPopularMexicoVideos]);
+  }, [searchYouTubeVideosByLocation, fetchPopularVideosByRegion, currentRegion]);
 
   // Obtener ubicación del usuario
   const getUserLocation = useCallback(async () => {
     if (!navigator.geolocation) {
       alert('La geolocalización no es compatible con este navegador.');
-      return fetchPopularMexicoVideos();
+      return fetchPopularVideosByRegion(currentRegion);
     }
 
     navigator.geolocation.getCurrentPosition(
@@ -585,7 +780,7 @@ const MainApp = () => {
         console.error('Error obteniendo ubicación:', err);
         setIsAnimating(false);
         alert('No se pudo obtener tu ubicación. Asegúrate de permitir el acceso a la ubicación.');
-        fetchPopularMexicoVideos();
+        fetchPopularVideosByRegion(currentRegion);
       },
       { 
         enableHighAccuracy: true,
@@ -593,7 +788,7 @@ const MainApp = () => {
         maximumAge: 30000
       }
     );
-  }, [getLocationName, loadVideosForLocation, fetchPopularMexicoVideos]);
+  }, [getLocationName, loadVideosForLocation, fetchPopularVideosByRegion, currentRegion]);
 
   // Cargar videos populares
   const fetchPopularVideos = useCallback(async () => {
@@ -645,34 +840,20 @@ const MainApp = () => {
     }
   }, [userLocation, userLocationName, getLocationName, searchYouTubeVideosByLocation, loadVideosForLocation]);
 
-  // Inicializar aplicación
-  useEffect(() => {
-    const initializeApp = async () => {
-      const savedLocation = localStorage.getItem('userLocation');
-      if (savedLocation) {
-        try {
-          const locationData = JSON.parse(savedLocation);
-          setUserLocation({ latitude: locationData.latitude, longitude: locationData.longitude });
-          setUserLocationName(locationData.name || 'Ubicación guardada');
-          await loadVideosForLocation(locationData.latitude, locationData.longitude, locationData.name);
-        } catch (error) {
-          console.error('Error:', error);
-          await fetchPopularMexicoVideos();
-        }
-      } else {
-        await fetchPopularMexicoVideos();
-      }
-    };
-
-    initializeApp();
-  }, [loadVideosForLocation, fetchPopularMexicoVideos]);
-
-  // Búsqueda de videos
+  // 🔒 BÚSQUEDA DE VIDEOS CON VERIFICACIÓN DE RESTRICCIONES
   const fetchVideos = useCallback(async (query, pageToken = '') => {
     setLoadingVideos(true);
     try {
       const locationData = await getLocationCoordinates(query);
       
+      // Verificar restricciones por país
+      const locationRestriction = checkRestrictions(query, locationData);
+      if (locationRestriction.restricted) {
+        alert(locationRestriction.message);
+        setLoadingVideos(false);
+        return;
+      }
+
       setTargetViewport({ 
         latitude: locationData.latitude, 
         longitude: locationData.longitude, 
@@ -710,6 +891,8 @@ const MainApp = () => {
       
       if (error.message.includes('Lugar no encontrado')) {
         alert('No se pudo encontrar el lugar especificado. Intenta con un nombre más específico.');
+      } else if (error.message === 'QUOTA_EXCEEDED') {
+        alert('Límite de cuota excedido para YouTube API.');
       }
       
       try {
@@ -799,25 +982,35 @@ const MainApp = () => {
 
   // Helper functions
   const getSidebarTitle = () => {
+    if (!youtubeAvailable) {
+      return 'YouTube No Disponible';
+    }
+    
     const titles = {
       popular: 'Videos Populares',
       other: 'Videos Cercanos', 
       current: 'Videos en tu Ubicación',
       search: `Resultados: "${searchTerm}"`,
       mexico: 'Videos Populares de México',
-      clicked: `Videos en ${clickedLocationName}`
+      clicked: `Videos en ${clickedLocationName}`,
+      unavailable: 'Servicio No Disponible'
     };
     return titles[activeFilter] || 'Videos con Vista Previa';
   };
 
   const getSidebarSubtitle = () => {
+    if (!youtubeAvailable) {
+      return youtubeError || 'YouTube no está disponible en tu país o región';
+    }
+    
     const subtitles = {
       popular: userLocationName ? `Videos populares en ${userLocationName}` : 'Videos populares en tu área',
       other: userLocationName ? `Videos cercanos a ${userLocationName}` : 'Videos en tu región',
       current: userLocationName ? `Basado en tu ubicación: ${userLocationName}` : 'Basado en tu ubicación actual',
       search: searchLocation ? `Ubicación: ${searchLocation.name}` : `Búsqueda: "${searchTerm}"`,
       mexico: 'Los videos más populares en México',
-      clicked: `Ubicación seleccionada: ${clickedLocationName}`
+      clicked: `Ubicación seleccionada: ${clickedLocationName}`,
+      unavailable: 'No se pueden cargar videos en tu región'
     };
     return subtitles[activeFilter] || 'Explorando contenido local';
   };
@@ -833,7 +1026,7 @@ const MainApp = () => {
       : `${minutes}:${seconds.padStart(2, '0')}`;
   };
 
-  // Modal de Historial - Diseño Mejorado
+  // Modal de Historial
   const HistoryModal = () => {
     if (!showHistoryModal) return null;
 
@@ -1013,9 +1206,21 @@ const MainApp = () => {
       {/* Navbar */}
       <div className="navbar absolute top-0 left-0 w-full h-20 flex items-center justify-between px-8 z-50">
         <div className="flex items-center gap-8">
-          <h1 className="text-3xl font-bold text-gradient bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
-            VideoMap Pro
-          </h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-3xl font-bold text-gradient bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
+              VideoMap Pro
+            </h1>
+            {!youtubeAvailable && (
+              <div className="bg-red-500/20 border border-red-500/50 rounded-lg px-3 py-1">
+                <p className="text-red-300 text-sm font-medium flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  YouTube no disponible - {regionConfig[currentRegion]?.name}
+                </p>
+              </div>
+            )}
+          </div>
           
           <form onSubmit={handleSearchSubmit} className="flex items-center">
             <input
@@ -1316,147 +1521,181 @@ const MainApp = () => {
               </p>
             </div>
           )}
+
+          {!youtubeAvailable && (
+            <div className="absolute top-6 left-6 glass-effect bg-red-500/20 border border-red-500/50 px-4 py-2 rounded-lg">
+              <p className="text-sm text-red-300 flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                YouTube no disponible en {regionConfig[currentRegion]?.name}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Sidebar */}
         <div className="w-1/3 bg-gradient-to-b from-slate-900 via-purple-900 to-blue-900 overflow-y-auto p-6 flex flex-col">
           <div className="text-center mb-6">
             <h2 className="text-3xl font-bold bg-gradient-to-r from-yellow-400 via-red-400 to-pink-400 bg-clip-text text-transparent">
-              {activeFilter === 'clicked' ? `Videos en ${clickedLocationName}` : getSidebarTitle()}
+              {getSidebarTitle()}
             </h2>
             <p className="text-cyan-300 text-sm mt-2">
-              {activeFilter === 'clicked' ? `Ubicación seleccionada: ${clickedLocationName}` : getSidebarSubtitle()}
+              {getSidebarSubtitle()}
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <button
-              onClick={fetchOtherVideos}
-              disabled={!userLocation || loadingVideos}
-              className={`font-bold py-3 px-4 rounded-2xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg ${
-                activeFilter === 'other' 
-                  ? 'bg-cyan-600 border-2 border-cyan-400' 
-                  : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600'
-              }`}
-            >
-              {loadingVideos && activeFilter === 'other' ? 'Cargando...' : 'Videos Cercanos'}
-            </button>
-            <button
-              onClick={fetchPopularVideos}
-              disabled={!userLocation || loadingVideos}
-              className={`font-bold py-3 px-4 rounded-2xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg ${
-                activeFilter === 'popular' 
-                  ? 'bg-orange-600 border-2 border-orange-400' 
-                  : 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600'
-              }`}
-            >
-              {loadingVideos && activeFilter === 'popular' ? 'Cargando...' : 'Populares'}
-            </button>
-          </div>
-
-          {loadingVideos && (
-            <div className="glass-effect bg-gray-800/50 rounded-2xl p-4 mb-6 text-center">
-              <p className="text-cyan-400 flex items-center justify-center gap-2">
-                <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-cyan-400"></span>
-                {activeFilter === 'search' ? 'Buscando videos...' : 'Cargando videos...'}
-              </p>
-            </div>
-          )}
-
-          {selectedVideo && (
-            <div className="glass-effect bg-gray-800/50 rounded-2xl p-4 mb-6 border-2 border-cyan-500/50">
-              <div className="text-center mb-3">
-                <h3 className="text-lg font-bold text-cyan-300">
-                  Vista Previa: {selectedVideo.channelTitle}
-                </h3>
-                <p className="text-sm text-gray-300 mt-1 line-clamp-2">{selectedVideo.title}</p>
-              </div>
-              <div className="bg-black rounded-lg overflow-hidden mb-3">
-                <YouTube
-                  videoId={selectedVideo.youtube_video_id}
-                  opts={{ 
-                    width: '100%', 
-                    height: '200',
-                    playerVars: { autoplay: 0, modestbranding: 1, rel: 0 }
-                  }}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <button 
-                  onClick={() => setSelectedVideo(null)}
-                  className="bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300"
-                >
-                  Cerrar
-                </button>
-                <button 
-                  onClick={handleWatchComplete}
-                  className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300 transform hover:scale-105"
-                >
-                  Ver Completo
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-4 flex-1 overflow-y-auto">
-            {videos.length > 0 ? (
-              <>
-                {videos.map((video) => (
-                  <div
-                    key={video.youtube_video_id}
-                    onClick={() => handleVideoClick(video)}
-                    onDoubleClick={() => handleVideoDoubleClick(video)}
-                    className={`glass-effect bg-gray-800/50 rounded-2xl p-4 cursor-pointer transform hover:scale-102 transition-all duration-300 border-l-4 ${
-                      video.isSearchResult 
-                        ? 'border-l-yellow-500 bg-yellow-500/10' 
-                        : video.isCurrentLocation 
-                          ? 'border-l-green-500 bg-green-500/10' 
-                          : 'border-l-cyan-500 bg-cyan-500/10'
-                    } ${selectedVideo?.youtube_video_id === video.youtube_video_id ? 'ring-2 ring-yellow-400' : ''}`}
-                    title="Click para vista previa, Doble click para ver completo"
-                  >
-                    <div className="flex gap-4">
-                      <div className="flex-shrink-0">
-                        <img 
-                          src={`https://img.youtube.com/vi/${video.youtube_video_id}/mqdefault.jpg`}
-                          alt="Miniatura del video"
-                          className="w-20 h-15 rounded-lg object-cover"
-                          onError={(e) => {
-                            e.target.src = 'https://via.placeholder.com/120x90/1f2937/6b7280?text=Video';
-                          }}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className={`h-3 w-3 rounded-full ${
-                            video.isSearchResult 
-                              ? 'bg-gradient-to-r from-yellow-500 to-orange-500' 
-                              : 'bg-gradient-to-r from-green-500 to-emerald-500'
-                          }`}></div>
-                          <p className="font-bold text-white text-sm">{video.channelTitle}</p>
-                        </div>
-                        <p className="text-xs text-gray-300 line-clamp-2 mb-1">{video.title}</p>
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="text-yellow-300">{video.views.toLocaleString()} vistas</span>
-                          {video.duration && video.duration !== 'PT0S' && (
-                            <span className="text-cyan-400">{formatDuration(video.duration)}</span>
-                          )}
-                        </div>
-                        <p className="text-xs text-cyan-400 mt-1">{video.location_name}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-400 text-lg">No se encontraron videos</p>
+          {!youtubeAvailable ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
+                  <svg className="w-12 h-12 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-red-300 mb-2">YouTube No Disponible</h3>
+                <p className="text-gray-400 mb-4">
+                  {youtubeError || 'YouTube no está disponible en tu país o región.'}
+                </p>
                 <p className="text-gray-500 text-sm">
-                  {userLocation ? 'Usa los botones para cargar videos' : 'Activa tu ubicación o usa la búsqueda'}
+                  Región detectada: {regionConfig[currentRegion]?.name}
                 </p>
               </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <button
+                  onClick={fetchOtherVideos}
+                  disabled={!userLocation || loadingVideos}
+                  className={`font-bold py-3 px-4 rounded-2xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg ${
+                    activeFilter === 'other' 
+                      ? 'bg-cyan-600 border-2 border-cyan-400' 
+                      : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600'
+                  }`}
+                >
+                  {loadingVideos && activeFilter === 'other' ? 'Cargando...' : 'Videos Cercanos'}
+                </button>
+                <button
+                  onClick={fetchPopularVideos}
+                  disabled={!userLocation || loadingVideos}
+                  className={`font-bold py-3 px-4 rounded-2xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg ${
+                    activeFilter === 'popular' 
+                      ? 'bg-orange-600 border-2 border-orange-400' 
+                      : 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600'
+                  }`}
+                >
+                  {loadingVideos && activeFilter === 'popular' ? 'Cargando...' : 'Populares'}
+                </button>
+              </div>
+
+              {loadingVideos && (
+                <div className="glass-effect bg-gray-800/50 rounded-2xl p-4 mb-6 text-center">
+                  <p className="text-cyan-400 flex items-center justify-center gap-2">
+                    <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-cyan-400"></span>
+                    {activeFilter === 'search' ? 'Buscando videos...' : 'Cargando videos...'}
+                  </p>
+                </div>
+              )}
+
+              {selectedVideo && (
+                <div className="glass-effect bg-gray-800/50 rounded-2xl p-4 mb-6 border-2 border-cyan-500/50">
+                  <div className="text-center mb-3">
+                    <h3 className="text-lg font-bold text-cyan-300">
+                      Vista Previa: {selectedVideo.channelTitle}
+                    </h3>
+                    <p className="text-sm text-gray-300 mt-1 line-clamp-2">{selectedVideo.title}</p>
+                  </div>
+                  <div className="bg-black rounded-lg overflow-hidden mb-3">
+                    <YouTube
+                      videoId={selectedVideo.youtube_video_id}
+                      opts={{ 
+                        width: '100%', 
+                        height: '200',
+                        playerVars: { autoplay: 0, modestbranding: 1, rel: 0 }
+                      }}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button 
+                      onClick={() => setSelectedVideo(null)}
+                      className="bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300"
+                    >
+                      Cerrar
+                    </button>
+                    <button 
+                      onClick={handleWatchComplete}
+                      className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300 transform hover:scale-105"
+                    >
+                      Ver Completo
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-4 flex-1 overflow-y-auto">
+                {videos.length > 0 ? (
+                  <>
+                    {videos.map((video) => (
+                      <div
+                        key={video.youtube_video_id}
+                        onClick={() => handleVideoClick(video)}
+                        onDoubleClick={() => handleVideoDoubleClick(video)}
+                        className={`glass-effect bg-gray-800/50 rounded-2xl p-4 cursor-pointer transform hover:scale-102 transition-all duration-300 border-l-4 ${
+                          video.isSearchResult 
+                            ? 'border-l-yellow-500 bg-yellow-500/10' 
+                            : video.isCurrentLocation 
+                              ? 'border-l-green-500 bg-green-500/10' 
+                              : 'border-l-cyan-500 bg-cyan-500/10'
+                        } ${selectedVideo?.youtube_video_id === video.youtube_video_id ? 'ring-2 ring-yellow-400' : ''}`}
+                        title="Click para vista previa, Doble click para ver completo"
+                      >
+                        <div className="flex gap-4">
+                          <div className="flex-shrink-0">
+                            <img 
+                              src={`https://img.youtube.com/vi/${video.youtube_video_id}/mqdefault.jpg`}
+                              alt="Miniatura del video"
+                              className="w-20 h-15 rounded-lg object-cover"
+                              onError={(e) => {
+                                e.target.src = 'https://via.placeholder.com/120x90/1f2937/6b7280?text=Video';
+                              }}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className={`h-3 w-3 rounded-full ${
+                                video.isSearchResult 
+                                  ? 'bg-gradient-to-r from-yellow-500 to-orange-500' 
+                                  : 'bg-gradient-to-r from-green-500 to-emerald-500'
+                              }`}></div>
+                              <p className="font-bold text-white text-sm">{video.channelTitle}</p>
+                            </div>
+                            <p className="text-xs text-gray-300 line-clamp-2 mb-1">{video.title}</p>
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="text-yellow-300">{video.views.toLocaleString()} vistas</span>
+                              {video.duration && video.duration !== 'PT0S' && (
+                                <span className="text-cyan-400">{formatDuration(video.duration)}</span>
+                              )}
+                            </div>
+                            <p className="text-xs text-cyan-400 mt-1">{video.location_name}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  !loadingVideos && (
+                    <div className="text-center py-8">
+                      <p className="text-gray-400 text-lg">No se encontraron videos</p>
+                      <p className="text-gray-500 text-sm">
+                        {userLocation ? 'Usa los botones para cargar videos' : 'Activa tu ubicación o usa la búsqueda'}
+                      </p>
+                    </div>
+                  )
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
