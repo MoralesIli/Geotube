@@ -36,11 +36,9 @@ app.use(express.json({ limit: '10mb' }));
 // API Keys
 const YOUTUBE_API_KEY = 'AIzaSyAMXqOfXkEHPmpu0O5a83k7c_snASAEJ50';
 const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
-
 const JWT_SECRET = 'tu_clave_secreta_super_segura_geotube_2024';
-
-// Configura el cliente de Google OAuth
 const GOOGLE_CLIENT_ID = '369281279205-i1b62ojhbhq6jel1oh8li22o1aklklqj.apps.googleusercontent.com';
+
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // Middleware para verificar token
@@ -54,11 +52,19 @@ const authenticateToken = (req, res, next) => {
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
-      return res.status(403).json({ error: 'Token inválido' });
+      return res.status(403).json({ error: 'Token invalido' });
     }
     req.user = user;
     next();
   });
+};
+
+// Utilidades reutilizables
+const executeQuery = (query, params = []) => db.promise().execute(query, params);
+
+const handleServerError = (res, error, context) => {
+  console.error(`Error en ${context}:`, error);
+  res.status(500).json({ error: 'Error interno del servidor' });
 };
 
 // ==================== RUTAS DE SALUD ====================
@@ -69,16 +75,23 @@ app.get('/api/health', (req, res) => {
 
 // ==================== RUTAS DE AUTENTICACIÓN ====================
 
-// Registro de usuario
+const validateAuthFields = (fields) => {
+  const { nombre, email, password } = fields;
+  if (!nombre || !email || !password) {
+    throw new Error('Todos los campos son requeridos');
+  }
+};
+
+const generateToken = (payload) => {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
+};
+
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { nombre, email, password } = req.body;
+    validateAuthFields({ nombre, email, password });
 
-    if (!nombre || !email || !password) {
-      return res.status(400).json({ error: 'Todos los campos son requeridos' });
-    }
-
-    const [existingUsers] = await db.promise().execute(
+    const [existingUsers] = await executeQuery(
       'SELECT id FROM usuarios WHERE email = ?',
       [email]
     );
@@ -88,35 +101,27 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    const [result] = await db.promise().execute(
+    const [result] = await executeQuery(
       'INSERT INTO usuarios (nombre, email, password) VALUES (?, ?, ?)',
       [nombre, email, hashedPassword]
     );
 
-    const token = jwt.sign(
-      { id: result.insertId, email },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
+    const token = generateToken({ id: result.insertId, email });
+    
     res.status(201).json({
       message: 'Usuario registrado exitosamente',
       token,
-      user: {
-        id: result.insertId,
-        nombre,
-        email
-      }
+      user: { id: result.insertId, nombre, email }
     });
 
   } catch (error) {
-    console.error('Error en registro:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    if (error.message === 'Todos los campos son requeridos') {
+      return res.status(400).json({ error: error.message });
+    }
+    handleServerError(res, error, 'registro');
   }
 });
 
-// Login de usuario
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -125,27 +130,23 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'Email y contraseña son requeridos' });
     }
 
-    const [users] = await db.promise().execute(
+    const [users] = await executeQuery(
       'SELECT * FROM usuarios WHERE email = ?',
       [email]
     );
 
     if (users.length === 0) {
-      return res.status(400).json({ error: 'Credenciales inválidas' });
+      return res.status(400).json({ error: 'Credenciales invalidas' });
     }
 
     const user = users[0];
     const validPassword = await bcrypt.compare(password, user.password);
     
     if (!validPassword) {
-      return res.status(400).json({ error: 'Credenciales inválidas' });
+      return res.status(400).json({ error: 'Credenciales invalidas' });
     }
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
+    const token = generateToken({ id: user.id, email: user.email });
 
     res.json({
       message: 'Login exitoso',
@@ -159,12 +160,10 @@ app.post('/api/auth/login', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error en login:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    handleServerError(res, error, 'login');
   }
 });
 
-// Ruta para autenticación con Google
 app.post('/api/auth/google', async (req, res) => {
   try {
     const { token } = req.body;
@@ -181,7 +180,7 @@ app.post('/api/auth/google', async (req, res) => {
     const payload = ticket.getPayload();
     const { sub: googleId, email, name, picture } = payload;
 
-    const [existingUsers] = await db.promise().execute(
+    const [existingUsers] = await executeQuery(
       'SELECT * FROM usuarios WHERE email = ? OR google_id = ?',
       [email, googleId]
     );
@@ -192,7 +191,7 @@ app.post('/api/auth/google', async (req, res) => {
       user = existingUsers[0];
       
       if (!user.google_id || !user.foto) {
-        await db.promise().execute(
+        await executeQuery(
           'UPDATE usuarios SET google_id = ?, foto = ? WHERE id = ?',
           [googleId, picture, user.id]
         );
@@ -200,7 +199,7 @@ app.post('/api/auth/google', async (req, res) => {
         user.foto = picture;
       }
     } else {
-      const [result] = await db.promise().execute(
+      const [result] = await executeQuery(
         'INSERT INTO usuarios (nombre, email, google_id, foto, password) VALUES (?, ?, ?, ?, ?)',
         [name, email, googleId, picture, '']
       );
@@ -214,14 +213,14 @@ app.post('/api/auth/google', async (req, res) => {
       };
     }
 
-    const jwtToken = jwt.sign(
-      { id: user.id, email: user.email },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
+    const jwtToken = generateToken({ 
+      id: user.id, 
+      email: user.email,
+      googleId: googleId 
+    });
 
     res.json({
-      message: 'Autenticación con Google exitosa',
+      message: 'Autenticacion con Google exitosa',
       token: jwtToken,
       user: {
         id: user.id,
@@ -233,20 +232,21 @@ app.post('/api/auth/google', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error en autenticación con Google:', error);
-    res.status(500).json({ error: 'Error en autenticación con Google' });
+    console.error('Error en autenticacion con Google:', error);
+    res.status(500).json({ error: 'Error en autenticacion con Google: ' + error.message });
   }
 });
 
-// Verificar token
 app.get('/api/auth/verify', authenticateToken, (req, res) => {
-  res.json({ valid: true, user: req.user });
+  res.json({ 
+    valid: true, 
+    user: req.user 
+  });
 });
 
-// Obtener perfil de usuario
 app.get('/api/auth/profile', authenticateToken, async (req, res) => {
   try {
-    const [users] = await db.promise().execute(
+    const [users] = await executeQuery(
       'SELECT id, nombre, email, foto, creado_en FROM usuarios WHERE id = ?',
       [req.user.id]
     );
@@ -255,7 +255,7 @@ app.get('/api/auth/profile', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
-    const [stats] = await db.promise().execute(
+    const [stats] = await executeQuery(
       `SELECT COUNT(*) as total_videos, 
               COUNT(DISTINCT video_id) as videos_unicos,
               MAX(fecha) as ultimo_acceso
@@ -270,24 +270,19 @@ app.get('/api/auth/profile', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error obteniendo perfil:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    handleServerError(res, error, 'obteniendo perfil');
   }
 });
 
 // ==================== RUTAS DE HISTORIAL ====================
 
-// Registrar acceso a video
 app.post('/api/register-video-access', authenticateToken, async (req, res) => {
   const { youtube_video_id, titulo, location_name, latitude, longitude, duracion_reproduccion = 0 } = req.body;
 
   try {
     console.log('Registrando acceso a video para usuario:', req.user.id);
-    console.log('Video ID:', youtube_video_id);
-    console.log('Ubicación:', location_name);
 
-    // Buscar si el video ya existe
-    let [videos] = await db.promise().execute(
+    const [videos] = await executeQuery(
       'SELECT id FROM videos WHERE youtube_video_id = ?', 
       [youtube_video_id]
     );
@@ -296,35 +291,27 @@ app.post('/api/register-video-access', authenticateToken, async (req, res) => {
     
     if (videos.length === 0) {
       console.log('Creando nuevo video en BD');
-      const [result] = await db.promise().execute(
+      const [result] = await executeQuery(
         'INSERT INTO videos (youtube_video_id, location_name, latitude, longitude, titulo) VALUES (?, ?, ?, ?, ?)',
         [youtube_video_id, location_name, latitude, longitude, titulo || 'Video de YouTube']
       );
       videoId = result.insertId;
-      console.log('Video creado con ID:', videoId);
     } else {
       videoId = videos[0].id;
-      console.log('Video existente, ID:', videoId);
     }
 
-    // Registrar el acceso
     const ip_origen = req.ip || req.connection.remoteAddress;
     const user_agent = req.get('User-Agent') || 'Unknown';
     
-    const [accessResult] = await db.promise().execute(
+    const [accessResult] = await executeQuery(
       'INSERT INTO accesos (usuario_id, video_id, es_valido, ip_origen, user_agent, duracion_reproduccion) VALUES (?, ?, 1, ?, ?, ?)',
       [req.user.id, videoId, ip_origen, user_agent, duracion_reproduccion]
     );
 
-    console.log('Acceso registrado exitosamente. ID de acceso:', accessResult.insertId);
-
-    // Actualizar contador de vistas del video
-    await db.promise().execute(
+    await executeQuery(
       'UPDATE videos SET vistas_totales = COALESCE(vistas_totales, 0) + 1 WHERE id = ?',
       [videoId]
     );
-
-    console.log('Contador de vistas actualizado');
 
     res.json({ 
       success: true, 
@@ -335,22 +322,22 @@ app.post('/api/register-video-access', authenticateToken, async (req, res) => {
 
   } catch (error) {
     console.error('Error registrando acceso:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    res.status(500).json({ 
+      error: 'Error interno del servidor',
+      details: error.message 
+    });
   }
 });
 
-// Obtener historial de videos vistos por usuario
 app.get('/api/user-history/:userId', authenticateToken, async (req, res) => {
   const { userId } = req.params;
 
   try {
-    console.log('Solicitando historial para usuario:', userId);
-
     if (parseInt(userId) !== req.user.id) {
       return res.status(403).json({ error: 'No autorizado' });
     }
 
-    const [history] = await db.promise().execute(`
+    const [history] = await executeQuery(`
       SELECT 
         v.youtube_video_id,
         v.titulo,
@@ -366,18 +353,14 @@ app.get('/api/user-history/:userId', authenticateToken, async (req, res) => {
       ORDER BY a.fecha DESC
       LIMIT 50
     `, [userId]);
-
-    console.log('Historial obtenido. Registros encontrados:', history.length);
     
     res.json(history);
 
   } catch (error) {
-    console.error('Error obteniendo historial:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    handleServerError(res, error, 'obteniendo historial');
   }
 });
 
-// Limpiar historial de usuario
 app.delete('/api/clear-history/:userId', authenticateToken, async (req, res) => {
   const { userId } = req.params;
 
@@ -386,14 +369,10 @@ app.delete('/api/clear-history/:userId', authenticateToken, async (req, res) => 
       return res.status(403).json({ error: 'No autorizado' });
     }
 
-    console.log('Limpiando historial para usuario:', userId);
-
-    const [result] = await db.promise().execute(
+    const [result] = await executeQuery(
       'DELETE FROM accesos WHERE usuario_id = ?',
       [userId]
     );
-
-    console.log('Historial limpiado. Registros eliminados:', result.affectedRows);
     
     res.json({ 
       success: true, 
@@ -402,14 +381,12 @@ app.delete('/api/clear-history/:userId', authenticateToken, async (req, res) => 
     });
 
   } catch (error) {
-    console.error('Error limpiando historial:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    handleServerError(res, error, 'limpiando historial');
   }
 });
 
 // ==================== RUTAS PRINCIPALES ====================
 
-// Función para buscar videos en YouTube por ubicación
 const searchYouTubeVideos = async (lat, lng, query) => {
   try {
     const response = await axios.get('https://www.googleapis.com/youtube/v3/search', {
@@ -429,7 +406,6 @@ const searchYouTubeVideos = async (lat, lng, query) => {
   }
 };
 
-// Función para obtener coordenadas de una búsqueda con Mapbox
 const geocodeLocation = async (query) => {
   try {
     const response = await axios.get(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json`, {
@@ -456,51 +432,56 @@ const geocodeLocation = async (query) => {
   }
 };
 
-// Endpoint para buscar y guardar videos por nombre de ubicación
+const saveVideosToDatabase = async (videos) => {
+  const insertPromises = videos.map(({ videoId, location_name, latitude, longitude }) => {
+    return executeQuery(
+      "INSERT INTO videos (location_name, latitude, longitude, youtube_video_id) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE location_name = VALUES(location_name)",
+      [location_name, latitude, longitude, videoId]
+    );
+  });
+
+  await Promise.all(insertPromises);
+  return videos.map(({ videoId, location_name, latitude, longitude }) => ({
+    location_name,
+    latitude,
+    longitude,
+    youtube_video_id: videoId,
+  }));
+};
+
 app.get('/api/search', async (req, res) => {
   const { q } = req.query;
   
   if (!q) {
-    return res.status(400).json({ error: 'Falta el término de búsqueda.' });
+    return res.status(400).json({ error: 'Falta el termino de busqueda.' });
   }
 
   try {
     const location = await geocodeLocation(q);
     if (!location) {
-      return res.status(404).json({ error: 'No se pudo encontrar la ubicación en México.' });
+      return res.status(404).json({ error: 'No se pudo encontrar la ubicacion en Mexico.' });
     }
 
     const youtubeVideos = await searchYouTubeVideos(location.latitude, location.longitude, q);
     if (!youtubeVideos || youtubeVideos.length === 0) {
-      return res.status(404).json({ error: 'No se encontraron videos de YouTube para esta ubicación.' });
+      return res.status(404).json({ error: 'No se encontraron videos de YouTube para esta ubicacion.' });
     }
 
-    const videoIds = youtubeVideos.map(item => item.id.videoId);
-    const insertPromises = videoIds.map(videoId => {
-      return db.promise().execute(
-        "INSERT INTO videos (location_name, latitude, longitude, youtube_video_id) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE location_name = VALUES(location_name)",
-        [location.location_name, location.latitude, location.longitude, videoId]
-      );
-    });
-
-    await Promise.all(insertPromises);
-    
-    const savedVideos = videoIds.map(videoId => ({
+    const videosToSave = youtubeVideos.map(item => ({
+      videoId: item.id.videoId,
       location_name: location.location_name,
       latitude: location.latitude,
       longitude: location.longitude,
-      youtube_video_id: videoId,
     }));
-    
+
+    const savedVideos = await saveVideosToDatabase(videosToSave);
     res.json(savedVideos);
 
   } catch (error) {
-    console.error('Error en búsqueda:', error);
-    res.status(500).json({ error: 'Error procesando la búsqueda.' });
+    handleServerError(res, error, 'busqueda de videos');
   }
 });
 
-// Endpoint: buscar videos cerca de coordenadas
 app.get('/api/searchByCoords', async (req, res) => {
   const { lat, lng } = req.query;
   
@@ -509,42 +490,31 @@ app.get('/api/searchByCoords', async (req, res) => {
   }
 
   try {
-    const youtubeVideos = await searchYouTubeVideos(lat, lng, 'México');
+    const youtubeVideos = await searchYouTubeVideos(lat, lng, 'Mexico');
     if (!youtubeVideos || youtubeVideos.length === 0) {
-      return res.status(404).json({ error: 'No se encontraron videos en esta ubicación.' });
+      return res.status(404).json({ error: 'No se encontraron videos en esta ubicacion.' });
     }
 
-    const videoIds = youtubeVideos.map(item => item.id.videoId);
-    const insertPromises = videoIds.map(videoId => {
-      return db.promise().execute(
-        "INSERT INTO videos (location_name, latitude, longitude, youtube_video_id) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE location_name = VALUES(location_name)",
-        ['Ubicación actual', lat, lng, videoId]
-      );
-    });
-
-    await Promise.all(insertPromises);
-    
-    const savedVideos = videoIds.map(videoId => ({
-      location_name: "Ubicación actual",
+    const videosToSave = youtubeVideos.map(item => ({
+      videoId: item.id.videoId,
+      location_name: "Ubicacion actual",
       latitude: parseFloat(lat),
       longitude: parseFloat(lng),
-      youtube_video_id: videoId,
     }));
-    
+
+    const savedVideos = await saveVideosToDatabase(videosToSave);
     res.json(savedVideos);
 
   } catch (error) {
-    console.error('Error en búsqueda por coordenadas:', error);
-    res.status(500).json({ error: 'Error procesando la búsqueda.' });
+    handleServerError(res, error, 'busqueda por coordenadas');
   }
 });
 
-// Endpoint para obtener información detallada del video
 app.get('/api/video/:videoId', async (req, res) => {
   try {
     const { videoId } = req.params;
 
-    const [videoRows] = await db.promise().execute(
+    const [videoRows] = await executeQuery(
       `SELECT v.*, 
               COUNT(a.id) as total_views,
               COUNT(DISTINCT a.ip_origen) as unique_viewers
@@ -561,7 +531,7 @@ app.get('/api/video/:videoId', async (req, res) => {
 
     const video = videoRows[0];
 
-    const [relatedRows] = await db.promise().execute(
+    const [relatedRows] = await executeQuery(
       `SELECT v.*, 
               COUNT(a.id) as view_count
        FROM videos v 
@@ -578,10 +548,7 @@ app.get('/api/video/:videoId', async (req, res) => {
         id: video.youtube_video_id,
         title: video.location_name,
         location: video.location_name,
-        coordinates: {
-          lat: video.latitude,
-          lng: video.longitude
-        },
+        coordinates: { lat: video.latitude, lng: video.longitude },
         uploadDate: video.creado_en,
         views: video.total_views || 0,
         uniqueViewers: video.unique_viewers || 0
@@ -590,12 +557,10 @@ app.get('/api/video/:videoId', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error obteniendo video:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    handleServerError(res, error, 'obteniendo video');
   }
 });
 
-// Ruta de prueba
 app.get('/api', (req, res) => {
   res.json({ message: 'API de GeoTube funcionando correctamente' });
 });
@@ -606,20 +571,21 @@ app.use((req, res) => {
   res.status(404).json({ 
     error: 'Ruta no encontrada',
     path: req.path,
-    method: req.method
+    method: req.method,
+    message: 'La ruta solicitada no existe en el servidor'
   });
 });
 
-// Manejo de errores global
 app.use((error, req, res, next) => {
   console.error('Error global:', error);
-  res.status(500).json({ error: 'Error interno del servidor' });
+  res.status(500).json({ 
+    error: 'Error interno del servidor',
+    message: error.message
+  });
 });
 
 // Iniciar el servidor
 app.listen(port, () => {
   console.log(`Servidor corriendo en http://localhost:${port}`);
   console.log(`API disponible en http://localhost:${port}/api`);
-  console.log(`Rutas de autenticación en http://localhost:${port}/api/auth`);
-  console.log(`Salud del servidor: http://localhost:${port}/api/health`);
 });
