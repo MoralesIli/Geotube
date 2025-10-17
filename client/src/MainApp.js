@@ -52,6 +52,9 @@ const MainApp = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchError, setSearchError] = useState('');
 
+  // Nuevos estados para categorías
+  const [selectedCategory, setSelectedCategory] = useState(null);
+
   // Referencias
   const animationRef = useRef();
   const startViewportRef = useRef(null);
@@ -59,15 +62,16 @@ const MainApp = () => {
   const suggestionsRef = useRef(null);
   const navigate = useNavigate();
 
-  // Constantes
-  const MAPBOX_TOKEN = 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
-  const YOUTUBE_API_KEY = 'AIzaSyCi_KpytxXFwg6wCQKTYoCiVffiFRoGlsQ';
+  // Constantes - MOVER A VARIABLES DE ENTORNO EN PRODUCCIÓN
+  const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN || 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
+  const YOUTUBE_API_KEY = process.env.REACT_APP_YOUTUBE_API_KEY || 'AIzaSyCi_KpytxXFwg6wCQKTYoCiVffiFRoGlsQ';
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
-  // 🔒 PAÍSES Y CIUDADES RESTRINGIDAS
-  const restrictedCountries = ['KP', 'IR', 'SY', 'SS', 'CU', 'CN', 'TM', 'UZ', 'TJ', 'ER', 'SD'];
+  // 🔒 PAÍSES Y CIUDADES RESTRINGIDAS - LISTA AMPLIADA
+  const restrictedCountries = ['KP', 'IR', 'SY', 'SS', 'CU', 'CN', 'TM', 'UZ', 'TJ', 'ER', 'SD', 'RU', 'BY', 'MM'];
   const restrictedCities = [
-    'pyongyang', 'corea del norte', 'north korea', 
-    'teherán', 'tehran', 'iran', 'irán',
+    'pyongyang', 'corea del norte', 'north korea', 'korea dpr',
+    'teherán', 'tehran', 'iran', 'irán', 
     'damasco', 'damascus', 'siria', 'syria',
     'juba', 'sudán del sur', 'south sudan',
     'la habana', 'havana', 'cuba',
@@ -76,7 +80,10 @@ const MainApp = () => {
     'tashkent', 'taskent', 'uzbekistán', 'uzbekistan',
     'dushanbe', 'tayikistán', 'tajikistan',
     'asmara', 'eritrea',
-    'jartum', 'khartoum', 'sudán', 'sudan'
+    'jartum', 'khartoum', 'sudán', 'sudan',
+    'moscú', 'moscow', 'rusia', 'russia',
+    'minsk', 'bielorrusia', 'belarus',
+    'yangon', 'myanmar', 'birmania'
   ];
 
   // Configuración por región
@@ -113,6 +120,60 @@ const MainApp = () => {
     }
   };
 
+  // Categorías de búsqueda
+  const categories = [
+    {
+      id: 'cultura',
+      name: 'Cultura',
+      keywords: [
+        'Cultura', 'Tradiciones', 'Costumbres', 'Festividades', 'Arte local',
+        'Música tradicional', 'Baile típico', 'Vestimenta tradicional', 'Idioma y dialectos'
+      ],
+      color: 'from-purple-500 to-pink-500',
+      bgColor: 'bg-gradient-to-r from-purple-500 to-pink-500'
+    },
+    {
+      id: 'gastronomia',
+      name: 'Gastronomía',
+      keywords: [
+        'Comida típica', 'Gastronomía', 'Platos regionales', 'Bebidas tradicionales',
+        'Mercados locales', 'Estilo de vida', 'Cocina tradicional', 'Recetas típicas'
+      ],
+      color: 'from-orange-500 to-red-500',
+      bgColor: 'bg-gradient-to-r from-orange-500 to-red-500'
+    },
+    {
+      id: 'naturaleza',
+      name: 'Naturaleza',
+      keywords: [
+        'Turismo', 'Lugares turísticos', 'Monumentos históricos', 'Parques naturales',
+        'Playas', 'Montañas', 'Arquitectura', 'Paisajes', 'Atracciones turísticas'
+      ],
+      color: 'from-green-500 to-emerald-500',
+      bgColor: 'bg-gradient-to-r from-green-500 to-emerald-500'
+    },
+    {
+      id: 'historia',
+      name: 'Historia',
+      keywords: [
+        'Historia del lugar', 'Personajes históricos', 'Museos', 'Patrimonio mundial',
+        'Arqueología', 'Antigüedades', 'Civilizaciones antiguas', 'Cultura prehispánica'
+      ],
+      color: 'from-amber-500 to-yellow-500',
+      bgColor: 'bg-gradient-to-r from-amber-500 to-yellow-500'
+    },
+    {
+      id: 'entretenimiento',
+      name: 'Entretenimiento',
+      keywords: [
+        'Eventos culturales', 'Festivales', 'Música moderna', 'Vida nocturna',
+        'Noticias del país', 'Entretenimiento', 'Festivales musicales', 'Eventos actuales'
+      ],
+      color: 'from-blue-500 to-cyan-500',
+      bgColor: 'bg-gradient-to-r from-blue-500 to-cyan-500'
+    }
+  ];
+
   // Sugerencias populares
   const popularSuggestions = [
     'Ciudad de México, México',
@@ -137,14 +198,18 @@ const MainApp = () => {
     'Estambul, Turquía'
   ];
 
-  // 🔒 FUNCIÓN PARA VERIFICAR RESTRICCIONES
-  const checkRestrictions = (query, locationData = null) => {
+  // 🔒 FUNCIÓN MEJORADA PARA VERIFICAR RESTRICCIONES
+  const checkRestrictions = useCallback((query, locationData = null) => {
+    console.log('🔍 Verificando restricciones para:', query, locationData);
+    
+    // Verificar ciudades/países restringidos en el query
     const restrictedPatterns = new RegExp(
       restrictedCities.map(city => city.toLowerCase()).join('|'), 
       'i'
     );
     
     if (restrictedPatterns.test(query.toLowerCase())) {
+      console.log('🚫 Query restringido detectado:', query);
       return {
         restricted: true,
         reason: 'query',
@@ -152,24 +217,40 @@ const MainApp = () => {
       };
     }
 
+    // Verificar si la ubicación está en país restringido
     if (locationData && locationData.countryCode) {
-      if (restrictedCountries.includes(locationData.countryCode.toUpperCase())) {
+      const countryCode = locationData.countryCode.toUpperCase();
+      if (restrictedCountries.includes(countryCode)) {
+        console.log('🚫 País restringido detectado:', countryCode);
         return {
           restricted: true,
           reason: 'country',
-          message: 'YouTube no está disponible en este país (restricción gubernamental).'
+          message: '⚠️ YouTube no está disponible en este país (restricción gubernamental).'
         };
       }
     }
 
+    // Verificar también el nombre de la ubicación
+    if (locationData && locationData.locationName) {
+      if (restrictedPatterns.test(locationData.locationName.toLowerCase())) {
+        console.log('🚫 Ubicación restringida detectada:', locationData.locationName);
+        return {
+          restricted: true,
+          reason: 'location',
+          message: '⚠️ Videos no disponibles en esta ubicación (restricción de YouTube).'
+        };
+      }
+    }
+
+    console.log('✅ Ubicación permitida');
     return { restricted: false };
-  };
+  }, []);
 
   // Función para validar tipo de ubicación
-  const isValidLocationType = (feature) => {
+  const isValidLocationType = useCallback((feature) => {
     const validTypes = ['country', 'region', 'place', 'locality', 'neighborhood', 'address'];
     return feature.place_type?.some(type => validTypes.includes(type));
-  };
+  }, []);
 
   // Función para obtener sugerencias
   const fetchSuggestions = async (query) => {
@@ -284,7 +365,7 @@ const MainApp = () => {
 
     try {
       const token = localStorage.getItem('token');
-      await fetch('http://localhost:3001/api/register-video-access', {
+      await fetch(`${API_BASE_URL}/api/register-video-access`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -310,7 +391,7 @@ const MainApp = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/user-history/${user.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/user-history/${user.id}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -334,7 +415,7 @@ const MainApp = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/clear-history/${user.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/clear-history/${user.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -419,7 +500,7 @@ const MainApp = () => {
     }
   };
 
-  // Manejar clic en el mapa
+  // 🔒 MANEJAR CLIC EN EL MAPA CON VERIFICACIÓN DE RESTRICCIONES
   const handleMapClick = async (event) => {
     const { lngLat } = event;
     const clickedLat = lngLat.lat;
@@ -442,7 +523,32 @@ const MainApp = () => {
     try {
       const locationCheck = await isValidMapLocation(clickedLat, clickedLng);
       
+      // 🔒 VERIFICAR RESTRICCIONES para el clic en el mapa
+      if (locationCheck.countryCode && restrictedCountries.includes(locationCheck.countryCode)) {
+        setIsValidLocation(false);
+        setClickedLocation({ latitude: clickedLat, longitude: clickedLng });
+        setClickedLocationName('País restringido - YouTube no disponible');
+        setShowLocationPopup(true);
+        setLoadingVideos(false);
+        return;
+      }
+      
       if (locationCheck.isValid && locationCheck.placeName) {
+        // 🔒 VERIFICAR RESTRICCIONES por nombre de ubicación
+        const restrictionCheck = checkRestrictions(locationCheck.placeName, {
+          countryCode: locationCheck.countryCode,
+          locationName: locationCheck.placeName
+        });
+        
+        if (restrictionCheck.restricted) {
+          setIsValidLocation(false);
+          setClickedLocation({ latitude: clickedLat, longitude: clickedLng });
+          setClickedLocationName(restrictionCheck.message);
+          setShowLocationPopup(true);
+          setLoadingVideos(false);
+          return;
+        }
+        
         setClickedLocation({ latitude: clickedLat, longitude: clickedLng });
         setClickedLocationName(locationCheck.placeName);
         setIsValidLocation(true);
@@ -475,6 +581,99 @@ const MainApp = () => {
       setClickedLocation({ latitude: clickedLat, longitude: clickedLng });
       setClickedLocationName('Error al obtener información de ubicación');
       setShowLocationPopup(true);
+    } finally {
+      setLoadingVideos(false);
+    }
+  };
+
+  // 🔒 BUSCAR VIDEOS POR CATEGORÍA CON VERIFICACIÓN DE RESTRICCIONES
+  const searchVideosByCategory = async (category) => {
+    setLoadingVideos(true);
+    setSelectedCategory(category);
+    
+    try {
+      let searchQuery;
+      let locationName;
+      let latitude, longitude;
+
+      // Determinar si usar ubicación clickeada o ubicación actual
+      if (clickedLocation && isValidLocation) {
+        latitude = clickedLocation.latitude;
+        longitude = clickedLocation.longitude;
+        locationName = clickedLocationName;
+      } else if (userLocation) {
+        latitude = userLocation.latitude;
+        longitude = userLocation.longitude;
+        locationName = userLocationName;
+      } else {
+        alert('Primero activa tu ubicación o haz clic en una ubicación válida en el mapa');
+        setLoadingVideos(false);
+        return;
+      }
+
+      // 🔒 VERIFICAR RESTRICCIONES para la ubicación
+      const locationCheck = await isValidMapLocation(latitude, longitude);
+      const restrictionCheck = checkRestrictions(locationName, {
+        countryCode: locationCheck.countryCode,
+        locationName: locationName
+      });
+      
+      if (restrictionCheck.restricted) {
+        alert(restrictionCheck.message);
+        setLoadingVideos(false);
+        return;
+      }
+
+      // Seleccionar una palabra clave aleatoria de la categoría
+      const randomKeyword = category.keywords[Math.floor(Math.random() * category.keywords.length)];
+      searchQuery = `${locationName} ${randomKeyword}`;
+      
+      const result = await searchYouTubeVideosByLocation(
+        latitude,
+        longitude,
+        locationName,
+        searchQuery
+      );
+      
+      if (result.videos.length > 0) {
+        setVideos(result.videos);
+        setNextPageToken(result.nextPageToken);
+        setActiveFilter('category');
+        setSearchLocation({
+          latitude: latitude,
+          longitude: longitude,
+          name: locationName
+        });
+        setShowLocationPopup(false);
+      } else {
+        // Intentar con otra palabra clave si la primera no funciona
+        const fallbackKeyword = category.keywords.find(k => k !== randomKeyword) || category.keywords[0];
+        const fallbackQuery = `${locationName} ${fallbackKeyword}`;
+        
+        const fallbackResult = await searchYouTubeVideosByLocation(
+          latitude,
+          longitude,
+          locationName,
+          fallbackQuery
+        );
+        
+        if (fallbackResult.videos.length > 0) {
+          setVideos(fallbackResult.videos);
+          setNextPageToken(fallbackResult.nextPageToken);
+          setActiveFilter('category');
+          setSearchLocation({
+            latitude: latitude,
+            longitude: longitude,
+            name: locationName
+          });
+          setShowLocationPopup(false);
+        } else {
+          alert(`No se encontraron videos de ${category.name} para esta ubicación`);
+        }
+      }
+    } catch (error) {
+      console.error('Error buscando videos por categoría:', error);
+      alert('Error al buscar videos para esta categoría');
     } finally {
       setLoadingVideos(false);
     }
@@ -652,7 +851,7 @@ const MainApp = () => {
       console.warn('Error obteniendo coordenadas:', error);
       throw error;
     }
-  }, [MAPBOX_TOKEN]);
+  }, [MAPBOX_TOKEN, isValidLocationType]);
 
   const getLocationName = useCallback(async (lat, lng) => {
     try {
@@ -853,6 +1052,20 @@ const MainApp = () => {
         try {
           const locationName = await getLocationName(latitude, longitude);
           setUserLocationName(locationName);
+          
+          // 🔒 VERIFICAR RESTRICCIONES para ubicación del usuario
+          const locationCheck = await isValidMapLocation(latitude, longitude);
+          const restrictionCheck = checkRestrictions(locationName, {
+            countryCode: locationCheck.countryCode,
+            locationName: locationName
+          });
+          
+          if (restrictionCheck.restricted) {
+            alert(restrictionCheck.message);
+            await fetchPopularVideosByRegion(currentRegion);
+            return;
+          }
+          
           await loadVideosForLocation(latitude, longitude, locationName);
 
           localStorage.setItem('userLocation', JSON.stringify({ 
@@ -878,7 +1091,7 @@ const MainApp = () => {
         maximumAge: 30000
       }
     );
-  }, [getLocationName, loadVideosForLocation, fetchPopularVideosByRegion, currentRegion]);
+  }, [getLocationName, loadVideosForLocation, fetchPopularVideosByRegion, currentRegion, checkRestrictions]);
 
   // Cargar videos populares
   const fetchPopularVideos = useCallback(async () => {
@@ -890,6 +1103,20 @@ const MainApp = () => {
     setLoadingVideos(true);
     try {
       const locationName = userLocationName || await getLocationName(userLocation.latitude, userLocation.longitude);
+      
+      // 🔒 VERIFICAR RESTRICCIONES
+      const locationCheck = await isValidMapLocation(userLocation.latitude, userLocation.longitude);
+      const restrictionCheck = checkRestrictions(locationName, {
+        countryCode: locationCheck.countryCode,
+        locationName: locationName
+      });
+      
+      if (restrictionCheck.restricted) {
+        alert(restrictionCheck.message);
+        setLoadingVideos(false);
+        return;
+      }
+      
       await loadVideosForLocation(userLocation.latitude, userLocation.longitude, locationName);
       setActiveFilter('popular');
       setTargetViewport({ latitude: userLocation.latitude, longitude: userLocation.longitude, zoom: 10 });
@@ -899,7 +1126,7 @@ const MainApp = () => {
     } finally {
       setLoadingVideos(false);
     }
-  }, [userLocation, userLocationName, getLocationName, loadVideosForLocation]);
+  }, [userLocation, userLocationName, getLocationName, loadVideosForLocation, checkRestrictions]);
 
   // Cargar otros videos
   const fetchOtherVideos = useCallback(async () => {
@@ -911,6 +1138,20 @@ const MainApp = () => {
     setLoadingVideos(true);
     try {
       const locationName = userLocationName || await getLocationName(userLocation.latitude, userLocation.longitude);
+      
+      // 🔒 VERIFICAR RESTRICCIONES
+      const locationCheck = await isValidMapLocation(userLocation.latitude, userLocation.longitude);
+      const restrictionCheck = checkRestrictions(locationName, {
+        countryCode: locationCheck.countryCode,
+        locationName: locationName
+      });
+      
+      if (restrictionCheck.restricted) {
+        alert(restrictionCheck.message);
+        setLoadingVideos(false);
+        return;
+      }
+      
       const result = await searchYouTubeVideosByLocation(userLocation.latitude, userLocation.longitude, locationName);
       
       if (result.videos.length > 0) {
@@ -928,12 +1169,12 @@ const MainApp = () => {
     } finally {
       setLoadingVideos(false);
     }
-  }, [userLocation, userLocationName, getLocationName, searchYouTubeVideosByLocation, loadVideosForLocation]);
+  }, [userLocation, userLocationName, getLocationName, searchYouTubeVideosByLocation, loadVideosForLocation, checkRestrictions]);
 
-  // 🔒 BÚSQUEDA DE VIDEOS CON VERIFICACIÓN DE RESTRICCIONES Y VALIDACIÓN
+  // 🔒 BÚSQUEDA MEJORADA CON VERIFICACIÓN COMPLETA DE RESTRICCIONES
   const fetchVideos = useCallback(async (query, pageToken = '') => {
     if (!query.trim()) {
-      setSearchError('Por favor ingresa un país, ciudad, lugar o dirección válida.');
+      setSearchError('Por favor ingresa un término de búsqueda válido.');
       return;
     }
 
@@ -941,26 +1182,88 @@ const MainApp = () => {
     setSearchError('');
     
     try {
-      const locationData = await getLocationCoordinates(query);
+      let latitude, longitude, locationName, countryCode;
+
+      // Determinar qué ubicación usar
+      if (clickedLocation && isValidLocation) {
+        // Usar ubicación clickeada en el mapa
+        latitude = clickedLocation.latitude;
+        longitude = clickedLocation.longitude;
+        locationName = clickedLocationName;
+        
+        // 🔒 VERIFICAR RESTRICCIONES para ubicación clickeada
+        const locationCheck = await isValidMapLocation(latitude, longitude);
+        const restrictionCheck = checkRestrictions(locationName, {
+          countryCode: locationCheck.countryCode,
+          locationName: locationName
+        });
+        
+        if (restrictionCheck.restricted) {
+          alert(restrictionCheck.message);
+          setLoadingVideos(false);
+          return;
+        }
+        
+      } else if (userLocation) {
+        // Usar ubicación actual del usuario
+        latitude = userLocation.latitude;
+        longitude = userLocation.longitude;
+        locationName = userLocationName;
+        
+        // 🔒 VERIFICAR RESTRICCIONES para ubicación actual
+        const locationCheck = await isValidMapLocation(latitude, longitude);
+        const restrictionCheck = checkRestrictions(locationName, {
+          countryCode: locationCheck.countryCode,
+          locationName: locationName
+        });
+        
+        if (restrictionCheck.restricted) {
+          alert(restrictionCheck.message);
+          setLoadingVideos(false);
+          return;
+        }
+        
+      } else {
+        // Buscar la ubicación por nombre
+        const locationData = await getLocationCoordinates(query.split(',')[0]);
+        latitude = locationData.latitude;
+        longitude = locationData.longitude;
+        locationName = locationData.locationName;
+        countryCode = locationData.countryCode;
+
+        // 🔒 VERIFICAR RESTRICCIONES para búsqueda por nombre
+        const restrictionCheck = checkRestrictions(query, locationData);
+        if (restrictionCheck.restricted) {
+          alert(restrictionCheck.message);
+          setLoadingVideos(false);
+          return;
+        }
+
+        setTargetViewport({ 
+          latitude: latitude, 
+          longitude: longitude, 
+          zoom: 10 
+        });
+      }
+
+      // 🔒 VERIFICACIÓN FINAL antes de buscar videos
+      const finalLocationCheck = await isValidMapLocation(latitude, longitude);
+      const finalRestrictionCheck = checkRestrictions(query, {
+        countryCode: finalLocationCheck.countryCode,
+        locationName: locationName
+      });
       
-      // Verificar restricciones por país
-      const locationRestriction = checkRestrictions(query, locationData);
-      if (locationRestriction.restricted) {
-        alert(locationRestriction.message);
+      if (finalRestrictionCheck.restricted) {
+        alert(finalRestrictionCheck.message);
         setLoadingVideos(false);
         return;
       }
 
-      setTargetViewport({ 
-        latitude: locationData.latitude, 
-        longitude: locationData.longitude, 
-        zoom: 10 
-      });
-
+      // Si pasa todas las verificaciones, buscar videos
       const result = await searchYouTubeVideosByLocation(
-        locationData.latitude,
-        locationData.longitude,
-        locationData.locationName,
+        latitude,
+        longitude,
+        locationName,
         query,
         pageToken
       );
@@ -973,20 +1276,20 @@ const MainApp = () => {
         }
         
         setNextPageToken(result.nextPageToken);
-        setUserLocationName(locationData.locationName);
+        setUserLocationName(locationName);
         setActiveFilter('search');
         setSearchLocation({
-          latitude: locationData.latitude,
-          longitude: locationData.longitude,
-          name: locationData.locationName
+          latitude: latitude,
+          longitude: longitude,
+          name: locationName
         });
         setShowSuggestions(false);
       } else {
-        throw new Error('No se encontraron videos para esta ubicación');
+        throw new Error('No se encontraron videos para esta búsqueda');
       }
     } catch (error) {
       console.error('Error en búsqueda:', error);
-      setSearchError(error.message || 'Error al buscar la ubicación. Verifica el nombre e intenta nuevamente.');
+      setSearchError(error.message || 'Error al realizar la búsqueda. Verifica el término e intenta nuevamente.');
       
       if (error.message.includes('Tipo de ubicación no válido')) {
         setSearchError('Solo se permiten búsquedas de países, ciudades, lugares o direcciones específicas.');
@@ -996,7 +1299,7 @@ const MainApp = () => {
     } finally {
       setLoadingVideos(false);
     }
-  }, [getLocationCoordinates, searchYouTubeVideosByLocation]);
+  }, [getLocationCoordinates, searchYouTubeVideosByLocation, clickedLocation, isValidLocation, clickedLocationName, userLocation, userLocationName, checkRestrictions]);
 
   // Handlers para el buscador con sugerencias
   const handleSearchChange = (e) => {
@@ -1019,7 +1322,7 @@ const MainApp = () => {
       fetchVideos(searchTerm);
       setShowSuggestions(false);
     } else {
-      setSearchError('Por favor ingresa un país, ciudad, lugar o dirección válida.');
+      setSearchError('Por favor ingresa un término de búsqueda válido.');
     }
   };
 
@@ -1108,6 +1411,7 @@ const MainApp = () => {
       search: `Resultados: "${searchTerm}"`,
       mexico: 'Videos Populares de México',
       clicked: `Videos en ${clickedLocationName}`,
+      category: selectedCategory ? `Videos de ${selectedCategory.name}` : 'Videos por Categoría',
       unavailable: 'Servicio No Disponible'
     };
     return titles[activeFilter] || 'Videos con Vista Previa';
@@ -1125,6 +1429,7 @@ const MainApp = () => {
       search: searchLocation ? `Ubicación: ${searchLocation.name}` : `Búsqueda: "${searchTerm}"`,
       mexico: 'Los videos más populares en México',
       clicked: `Ubicación seleccionada: ${clickedLocationName}`,
+      category: selectedCategory ? `${selectedCategory.name} en ${searchLocation?.name || userLocationName || clickedLocationName}` : 'Explorando por categoría',
       unavailable: 'No se pueden cargar videos en tu región'
     };
     return subtitles[activeFilter] || 'Explorando contenido local';
@@ -1165,6 +1470,39 @@ const MainApp = () => {
             </div>
           </button>
         ))}
+      </div>
+    );
+  };
+
+  // Componente de Categorías en el Mapa
+  const MapCategories = () => {
+    const hasValidLocation = (clickedLocation && isValidLocation) || userLocation;
+    
+    return (
+      <div className="absolute top-6 left-6 glass-effect bg-gray-800/80 backdrop-blur-md rounded-2xl p-4 shadow-2xl border border-gray-600">
+        <div className="flex flex-col gap-2">
+          <p className="text-cyan-400 text-sm font-semibold mb-2 text-center">Categorías</p>
+          {categories.map((category) => (
+            <button
+              key={category.id}
+              onClick={() => searchVideosByCategory(category)}
+              disabled={!hasValidLocation}
+              className={`flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-white transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed text-sm ${
+                selectedCategory?.id === category.id 
+                  ? `ring-2 ring-white ${category.bgColor}`
+                  : `bg-gradient-to-r ${category.color} hover:shadow-lg`
+              }`}
+              title={hasValidLocation ? category.name : 'Primero activa tu ubicación o selecciona una en el mapa'}
+            >
+              <span className="font-medium">{category.name}</span>
+            </button>
+          ))}
+        </div>
+        {!hasValidLocation && (
+          <p className="text-xs text-gray-400 mt-2 text-center">
+            Activa tu ubicación o selecciona una en el mapa
+          </p>
+        )}
       </div>
     );
   };
@@ -1371,7 +1709,7 @@ const MainApp = () => {
                 <input
                   ref={searchInputRef}
                   type="text"
-                  placeholder="Buscar países, ciudades, lugares..."
+                  placeholder="Buscar términos como 'tacos', 'corridas de toros', etc."
                   value={searchTerm}
                   onChange={handleSearchChange}
                   onFocus={handleSearchFocus}
@@ -1583,7 +1921,7 @@ const MainApp = () => {
                 anchor="top"
                 className="rounded-xl shadow-2xl border border-gray-300 bg-white/95 backdrop-blur-md"
               >
-                <div className="p-4 w-50 text-center text-gray-800">
+                <div className="p-4 w-60 text-center text-gray-800">
                   <h3 className="font-semibold text-lg mb-2 leading-snug">
                     {isValidLocation ? clickedLocationName : 'Ubicación no disponible'}
                   </h3>
@@ -1658,7 +1996,7 @@ const MainApp = () => {
               >
                 <div
                   onClick={() => handleMarkerClick(video)}
-                  onDoubleClick={() => handleMarkerDoubleClick(video)}
+                  onDoubleClick={() => handleVideoDoubleClick(video)}
                   className="cursor-pointer text-3xl transform hover:scale-150 transition-all duration-300"
                   title="Click para vista previa, Doble click para ver completo"
                 >
@@ -1674,6 +2012,9 @@ const MainApp = () => {
             ))}
           </Map>
 
+          {/* Botones de categorías flotantes - SOLO EN EL MAPA */}
+          <MapCategories />
+
           <button
             onClick={getUserLocation}
             disabled={isAnimating}
@@ -1683,7 +2024,7 @@ const MainApp = () => {
           </button>
 
           {isAnimating && (
-            <div className="absolute top-6 left-6 glass-effect bg-gray-800/80 px-4 py-2 rounded-lg">
+            <div className="absolute top-6 right-6 glass-effect bg-gray-800/80 px-4 py-2 rounded-lg">
               <p className="text-sm text-cyan-400 flex items-center gap-2">
                 <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-cyan-400"></span>
                 Moviendo a la ubicación...
@@ -1692,7 +2033,7 @@ const MainApp = () => {
           )}
 
           {!youtubeAvailable && (
-            <div className="absolute top-6 left-6 glass-effect bg-red-500/20 border border-red-500/50 px-4 py-2 rounded-lg">
+            <div className="absolute top-20 left-6 glass-effect bg-red-500/20 border border-red-500/50 px-4 py-2 rounded-lg">
               <p className="text-sm text-red-300 flex items-center gap-2">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
