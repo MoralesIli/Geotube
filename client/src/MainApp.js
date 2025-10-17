@@ -47,10 +47,16 @@ const MainApp = () => {
   const [youtubeAvailable, setYoutubeAvailable] = useState(true);
   const [youtubeError, setYoutubeError] = useState('');
 
+  // Nuevos estados para sugerencias y validación
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searchError, setSearchError] = useState('');
+
   // Referencias
   const animationRef = useRef();
   const startViewportRef = useRef(null);
   const searchInputRef = useRef(null);
+  const suggestionsRef = useRef(null);
   const navigate = useNavigate();
 
   // Constantes
@@ -107,6 +113,30 @@ const MainApp = () => {
     }
   };
 
+  // Sugerencias populares
+  const popularSuggestions = [
+    'Ciudad de México, México',
+    'Cancún, México',
+    'Guadalajara, México',
+    'Monterrey, México',
+    'Madrid, España',
+    'Barcelona, España',
+    'New York, USA',
+    'Los Angeles, USA',
+    'Tokyo, Japón',
+    'París, Francia',
+    'Londres, Reino Unido',
+    'Roma, Italia',
+    'Buenos Aires, Argentina',
+    'Santiago, Chile',
+    'Bogotá, Colombia',
+    'Lima, Perú',
+    'São Paulo, Brasil',
+    'Berlín, Alemania',
+    'Ámsterdam, Países Bajos',
+    'Estambul, Turquía'
+  ];
+
   // 🔒 FUNCIÓN PARA VERIFICAR RESTRICCIONES
   const checkRestrictions = (query, locationData = null) => {
     const restrictedPatterns = new RegExp(
@@ -118,7 +148,7 @@ const MainApp = () => {
       return {
         restricted: true,
         reason: 'query',
-        message: ' Videos no disponibles en esta región (restricción de YouTube).'
+        message: '⚠️ Videos no disponibles en esta región (restricción de YouTube).'
       };
     }
 
@@ -127,12 +157,49 @@ const MainApp = () => {
         return {
           restricted: true,
           reason: 'country',
-          message: '⚠️ YouTube no está disponible en este país (restricción gubernamental).'
+          message: 'YouTube no está disponible en este país (restricción gubernamental).'
         };
       }
     }
 
     return { restricted: false };
+  };
+
+  // Función para validar tipo de ubicación
+  const isValidLocationType = (feature) => {
+    const validTypes = ['country', 'region', 'place', 'locality', 'neighborhood', 'address'];
+    return feature.place_type?.some(type => validTypes.includes(type));
+  };
+
+  // Función para obtener sugerencias
+  const fetchSuggestions = async (query) => {
+    if (!query.trim()) {
+      setSuggestions(popularSuggestions);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
+        `access_token=${MAPBOX_TOKEN}&` +
+        `types=country,region,place,locality,neighborhood,address&` +
+        `limit=5&` +
+        `language=es`
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const validSuggestions = data.features
+          .filter(feature => isValidLocationType(feature))
+          .map(feature => feature.place_name)
+          .slice(0, 5);
+
+        setSuggestions(validSuggestions);
+      }
+    } catch (error) {
+      console.warn('Error obteniendo sugerencias:', error);
+      setSuggestions([]);
+    }
   };
 
   // Función para detectar región del usuario
@@ -290,7 +357,7 @@ const MainApp = () => {
       const response = await fetch(
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?` +
         `access_token=${MAPBOX_TOKEN}&` +
-        `types=country,region,place,locality,neighborhood&` +
+        `types=country,region,place,locality,neighborhood,address&` +
         `limit=1&` +
         `language=es`
       );
@@ -314,11 +381,7 @@ const MainApp = () => {
           };
         }
         
-        const validTypes = ['country', 'region', 'place', 'locality', 'neighborhood'];
-        
-        if (!validTypes.includes(featureType)) {
-          return { isValid: false, placeName: null, featureType };
-        }
+        const isValid = isValidLocationType(feature);
         
         const invalidPatterns = [
           /unamed road/i,
@@ -341,11 +404,9 @@ const MainApp = () => {
         const hasValidName = !invalidPatterns.some(pattern => pattern.test(placeName)) && 
                             placeName.trim().length > 0;
         
-        const isValid = hasValidName && validTypes.includes(featureType);
-        
         return {
-          isValid,
-          placeName: isValid ? placeName : null,
+          isValid: isValid && hasValidName,
+          placeName: isValid && hasValidName ? placeName : null,
           featureType,
           countryCode
         };
@@ -542,11 +603,29 @@ const MainApp = () => {
     };
   }, [targetViewport]);
 
+  // Efecto para manejar clics fuera del dropdown de sugerencias
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   // Funciones de geocoding
   const getLocationCoordinates = useCallback(async (placeName) => {
     try {
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(placeName)}.json?access_token=${MAPBOX_TOKEN}&types=place,locality,region&limit=1&language=es`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(placeName)}.json?` +
+        `access_token=${MAPBOX_TOKEN}&` +
+        `types=country,region,place,locality,neighborhood,address&` +
+        `limit=1&` +
+        `language=es`
       );
       
       if (!response.ok) throw new Error('Error en geocoding');
@@ -554,14 +633,21 @@ const MainApp = () => {
       const data = await response.json();
       
       if (data.features?.[0]) {
-        const [longitude, latitude] = data.features[0].center;
-        const locationName = data.features[0].place_name;
-        const countryCode = data.features[0].properties.short_code?.toUpperCase();
+        const feature = data.features[0];
+        
+        // Validar que sea un tipo de ubicación permitido
+        if (!isValidLocationType(feature)) {
+          throw new Error('Tipo de ubicación no válido. Solo se permiten países, ciudades, lugares o direcciones.');
+        }
+
+        const [longitude, latitude] = feature.center;
+        const locationName = feature.place_name;
+        const countryCode = feature.properties.short_code?.toUpperCase();
         
         return { latitude, longitude, locationName, countryCode };
       }
       
-      throw new Error('Lugar no encontrado');
+      throw new Error('Ubicación no encontrada. Verifica el nombre e intenta nuevamente.');
     } catch (error) {
       console.warn('Error obteniendo coordenadas:', error);
       throw error;
@@ -571,7 +657,11 @@ const MainApp = () => {
   const getLocationName = useCallback(async (lat, lng) => {
     try {
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}&types=place,locality&limit=1&language=es`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?` +
+        `access_token=${MAPBOX_TOKEN}&` +
+        `types=place,locality&` +
+        `limit=1&` +
+        `language=es`
       );
       
       if (!response.ok) throw new Error('Error en geocoding');
@@ -840,9 +930,16 @@ const MainApp = () => {
     }
   }, [userLocation, userLocationName, getLocationName, searchYouTubeVideosByLocation, loadVideosForLocation]);
 
-  // 🔒 BÚSQUEDA DE VIDEOS CON VERIFICACIÓN DE RESTRICCIONES
+  // 🔒 BÚSQUEDA DE VIDEOS CON VERIFICACIÓN DE RESTRICCIONES Y VALIDACIÓN
   const fetchVideos = useCallback(async (query, pageToken = '') => {
+    if (!query.trim()) {
+      setSearchError('Por favor ingresa un país, ciudad, lugar o dirección válida.');
+      return;
+    }
+
     setLoadingVideos(true);
+    setSearchError('');
+    
     try {
       const locationData = await getLocationCoordinates(query);
       
@@ -883,32 +980,61 @@ const MainApp = () => {
           longitude: locationData.longitude,
           name: locationData.locationName
         });
+        setShowSuggestions(false);
       } else {
         throw new Error('No se encontraron videos para esta ubicación');
       }
     } catch (error) {
       console.error('Error en búsqueda:', error);
+      setSearchError(error.message || 'Error al buscar la ubicación. Verifica el nombre e intenta nuevamente.');
       
-      if (error.message.includes('Lugar no encontrado')) {
-        alert('No se pudo encontrar el lugar especificado. Intenta con un nombre más específico.');
+      if (error.message.includes('Tipo de ubicación no válido')) {
+        setSearchError('Solo se permiten búsquedas de países, ciudades, lugares o direcciones específicas.');
       } else if (error.message === 'QUOTA_EXCEEDED') {
-        alert('Límite de cuota excedido para YouTube API.');
-      }
-      
-      try {
-        const fallbackResult = await searchYouTubeVideosByLocation(
-          23.6345, -102.5528, 'México', query
-        );
-        setVideos(fallbackResult.videos);
-        setNextPageToken(fallbackResult.nextPageToken);
-        setActiveFilter('search');
-      } catch (fallbackError) {
-        console.error('Error en búsqueda fallback:', fallbackError);
+        setSearchError('Límite de cuota excedido para YouTube API.');
       }
     } finally {
       setLoadingVideos(false);
     }
   }, [getLocationCoordinates, searchYouTubeVideosByLocation]);
+
+  // Handlers para el buscador con sugerencias
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    setSearchError('');
+
+    if (value.trim()) {
+      fetchSuggestions(value);
+      setShowSuggestions(true);
+    } else {
+      setSuggestions(popularSuggestions);
+      setShowSuggestions(true);
+    }
+  };
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (searchTerm.trim()) {
+      fetchVideos(searchTerm);
+      setShowSuggestions(false);
+    } else {
+      setSearchError('Por favor ingresa un país, ciudad, lugar o dirección válida.');
+    }
+  };
+
+  const handleSuggestionClick = (suggestion) => {
+    setSearchTerm(suggestion);
+    setShowSuggestions(false);
+    fetchVideos(suggestion);
+  };
+
+  const handleSearchFocus = () => {
+    if (!suggestions.length) {
+      setSuggestions(popularSuggestions);
+    }
+    setShowSuggestions(true);
+  };
 
   // Handlers de UI
   const handleLogin = (userData) => {
@@ -969,17 +1095,6 @@ const MainApp = () => {
     selectedVideo?.youtube_video_id && navigate(`/video/${selectedVideo.youtube_video_id}`);
   };
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    if (searchTerm.trim()) {
-      fetchVideos(searchTerm);
-    }
-  };
-
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
-  };
-
   // Helper functions
   const getSidebarTitle = () => {
     if (!youtubeAvailable) {
@@ -1024,6 +1139,34 @@ const MainApp = () => {
     return hours 
       ? `${hours}:${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}`
       : `${minutes}:${seconds.padStart(2, '0')}`;
+  };
+
+  // Componente de Sugerencias
+  const SearchSuggestions = () => {
+    if (!showSuggestions || !suggestions.length) return null;
+
+    return (
+      <div 
+        ref={suggestionsRef}
+        className="absolute top-full left-0 right-0 mt-1 bg-gray-800/95 backdrop-blur-md border border-gray-600 rounded-xl shadow-2xl z-50 max-h-60 overflow-y-auto"
+      >
+        {suggestions.map((suggestion, index) => (
+          <button
+            key={index}
+            onClick={() => handleSuggestionClick(suggestion)}
+            className="w-full text-left px-4 py-3 hover:bg-cyan-500/20 border-b border-gray-700 last:border-b-0 transition-all duration-200 text-white hover:text-cyan-300"
+          >
+            <div className="flex items-center gap-3">
+              <svg className="w-4 h-4 text-cyan-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span className="text-sm">{suggestion}</span>
+            </div>
+          </button>
+        ))}
+      </div>
+    );
   };
 
   // Modal de Historial
@@ -1222,22 +1365,48 @@ const MainApp = () => {
             )}
           </div>
           
-          <form onSubmit={handleSearchSubmit} className="flex items-center">
-            <input
-              type="text"
-              placeholder="Buscar ciudades, lugares..."
-              value={searchTerm}
-              onChange={handleSearchChange}
-              className="search-input glass-effect bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 w-80"
-            />
-            
-            <button 
-              type="submit" 
-              className="ml-4 btn-primary bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 px-4 py-2 rounded-lg transition-all duration-300"
-            >
-              Buscar
-            </button>
-          </form>
+          <div className="relative">
+            <form onSubmit={handleSearchSubmit} className="flex items-center">
+              <div className="relative">
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Buscar países, ciudades, lugares..."
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                  onFocus={handleSearchFocus}
+                  className="search-input glass-effect bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 w-80 pr-10"
+                />
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+              </div>
+              
+              <button 
+                type="submit" 
+                className="ml-4 btn-primary bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 px-4 py-2 rounded-lg transition-all duration-300"
+              >
+                Buscar
+              </button>
+            </form>
+
+            {/* Sugerencias */}
+            <SearchSuggestions />
+
+            {/* Mensaje de error */}
+            {searchError && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-red-500/20 border border-red-500/50 rounded-lg p-3 text-red-300 text-sm">
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <span>{searchError}</span>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-6">
