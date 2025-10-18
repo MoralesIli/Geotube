@@ -33,6 +33,14 @@ const VideoPlayer = () => {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [categoryClickCount, setCategoryClickCount] = useState(0);
 
+  // NUEVOS ESTADOS PARA EL BUSCADOR Y PAGINACIÓN
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchError, setSearchError] = useState('');
+  const [nextPageToken, setNextPageToken] = useState('');
+  const [hasMoreVideos, setHasMoreVideos] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [currentSearchType, setCurrentSearchType] = useState('related'); // 'related', 'category', 'search'
+
   const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN || 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
   const YOUTUBE_API_KEY = process.env.REACT_APP_YOUTUBE_API_KEY || 'AIzaSyAmkc92taptBHHwQsQdOJiGW7Wktghl-OI';
 
@@ -268,24 +276,31 @@ const VideoPlayer = () => {
     return categories[categoryId] || 'Unknown Category';
   }, []);
 
-  const fetchRelatedVideos = useCallback(async (currentVideoId, locationName, category = null) => {
+  // FUNCIÓN MODIFICADA PARA SOPORTAR PAGINACIÓN
+  const fetchRelatedVideos = useCallback(async (currentVideoId, locationName, category = null, searchQuery = '', pageToken = '', isLoadMore = false) => {
     try {
-      const currentVideoData = await fetchVideoStatistics(currentVideoId);
+      let finalSearchQuery = searchQuery;
       
-      let searchQuery;
-      
-      if (category) {
-        const randomKeyword = category.keywords[Math.floor(Math.random() * category.keywords.length)];
-        searchQuery = `${locationName} ${randomKeyword}`;
-        console.log(`Buscando videos por categoria ${category.name}:`, searchQuery);
-      } else {
-        searchQuery = currentVideoData?.channelTitle || locationName || 'Mexico';
-        console.log('Busqueda normal de videos relacionados:', searchQuery);
+      if (!searchQuery) {
+        const currentVideoData = await fetchVideoStatistics(currentVideoId);
+        
+        if (category) {
+          const randomKeyword = category.keywords[Math.floor(Math.random() * category.keywords.length)];
+          finalSearchQuery = `${locationName} ${randomKeyword}`;
+          console.log(`Buscando videos por categoria ${category.name}:`, finalSearchQuery);
+        } else {
+          finalSearchQuery = currentVideoData?.channelTitle || locationName || 'Mexico';
+          console.log('Busqueda normal de videos relacionados:', finalSearchQuery);
+        }
       }
 
-      const response = await fetch(
-        `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&relevanceLanguage=es&q=${encodeURIComponent(searchQuery)}&key=${YOUTUBE_API_KEY}`
-      );
+      let url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&relevanceLanguage=es&q=${encodeURIComponent(finalSearchQuery)}&key=${YOUTUBE_API_KEY}`;
+
+      if (pageToken) {
+        url += `&pageToken=${pageToken}`;
+      }
+
+      const response = await fetch(url);
 
       if (response.ok) {
         const data = await response.json();
@@ -298,18 +313,107 @@ const VideoPlayer = () => {
             channelTitle: item.snippet.channelTitle,
             thumbnail: item.snippet.thumbnails.default.url,
             publishedAt: item.snippet.publishedAt,
-            searchCategory: category?.name || 'general'
+            searchCategory: category?.name || 'general',
+            searchType: searchQuery ? 'search' : (category ? 'category' : 'related')
           }));
 
         console.log(`${relatedVideos.length} videos relacionados encontrados`);
-        return relatedVideos;
+        
+        return {
+          videos: relatedVideos,
+          nextPageToken: data.nextPageToken || ''
+        };
       }
-      return [];
+      return { videos: [], nextPageToken: '' };
     } catch (error) {
       console.error('Error fetching related videos:', error);
-      return [];
+      return { videos: [], nextPageToken: '' };
     }
   }, [YOUTUBE_API_KEY, fetchVideoStatistics]);
+
+  // NUEVA FUNCIÓN PARA BÚSQUEDA POR TÉRMINO
+  const handleSearchSubmit = async (e) => {
+    if (e) e.preventDefault();
+    
+    if (!searchTerm.trim()) {
+      setSearchError('Por favor ingresa un término de búsqueda válido.');
+      return;
+    }
+
+    setSearchError('');
+    setLoading(true);
+
+    // Determinar ubicación para la búsqueda
+    let locationName = 'Mexico';
+    if (selectedLocationName) {
+      locationName = selectedLocationName;
+    } else if (userLocationName) {
+      locationName = userLocationName;
+    } else if (videoLocationName) {
+      locationName = videoLocationName;
+    }
+
+    try {
+      const result = await fetchRelatedVideos(videoId, locationName, null, searchTerm, '');
+      
+      if (result.videos.length > 0) {
+        setRelatedVideos(result.videos);
+        setNextPageToken(result.nextPageToken);
+        setHasMoreVideos(!!result.nextPageToken);
+        setCurrentSearchType('search');
+        setSelectedCategory(null);
+        console.log(`Búsqueda exitosa para "${searchTerm}" en ${locationName}`);
+      } else {
+        setSearchError(`No se encontraron videos para "${searchTerm}"`);
+        setRelatedVideos([]);
+      }
+    } catch (error) {
+      console.error('Error en búsqueda:', error);
+      setSearchError('Error al realizar la búsqueda');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // NUEVA FUNCIÓN PARA CARGAR MÁS VIDEOS
+  const loadMoreVideos = async () => {
+    if (!nextPageToken || isLoadingMore) return;
+
+    setIsLoadingMore(true);
+
+    try {
+      // Determinar ubicación para la búsqueda
+      let locationName = 'Mexico';
+      if (selectedLocationName) {
+        locationName = selectedLocationName;
+      } else if (userLocationName) {
+        locationName = userLocationName;
+      } else if (videoLocationName) {
+        locationName = videoLocationName;
+      }
+
+      let searchQuery = '';
+      let category = null;
+
+      if (currentSearchType === 'search') {
+        searchQuery = searchTerm;
+      } else if (currentSearchType === 'category') {
+        category = selectedCategory;
+      }
+
+      const result = await fetchRelatedVideos(videoId, locationName, category, searchQuery, nextPageToken, true);
+      
+      if (result.videos.length > 0) {
+        setRelatedVideos(prev => [...prev, ...result.videos]);
+        setNextPageToken(result.nextPageToken);
+        setHasMoreVideos(!!result.nextPageToken);
+      }
+    } catch (error) {
+      console.error('Error cargando más videos:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
 
   const handleCategoryClick = (category) => {
     setCategoryClickCount(prev => {
@@ -335,6 +439,7 @@ const VideoPlayer = () => {
   const selectCategory = async (category) => {
     console.log(`Categoria seleccionada: ${category.name}`);
     setSelectedCategory(category);
+    setSearchTerm(''); // Limpiar búsqueda al seleccionar categoría
     
     // Prioridad para la busqueda: ubicacion seleccionada -> ubicacion actual -> ubicacion del video -> Mexico
     let locationName = 'Mexico';
@@ -346,8 +451,11 @@ const VideoPlayer = () => {
       locationName = videoLocationName;
     }
 
-    const relatedVideosByCategory = await fetchRelatedVideos(videoId, locationName, category);
-    setRelatedVideos(relatedVideosByCategory);
+    const result = await fetchRelatedVideos(videoId, locationName, category);
+    setRelatedVideos(result.videos);
+    setNextPageToken(result.nextPageToken);
+    setHasMoreVideos(!!result.nextPageToken);
+    setCurrentSearchType('category');
     
     console.log(`Mostrando videos de ${category.name} para ${locationName}`);
   };
@@ -355,6 +463,7 @@ const VideoPlayer = () => {
   const clearCategorySelection = async () => {
     console.log('Limpiando seleccion de categoria');
     setSelectedCategory(null);
+    setSearchTerm(''); // Limpiar búsqueda
     
     let locationName = 'Mexico';
     if (selectedLocationName) {
@@ -365,8 +474,11 @@ const VideoPlayer = () => {
       locationName = videoLocationName;
     }
 
-    const normalRelatedVideos = await fetchRelatedVideos(videoId, locationName);
-    setRelatedVideos(normalRelatedVideos);
+    const result = await fetchRelatedVideos(videoId, locationName);
+    setRelatedVideos(result.videos);
+    setNextPageToken(result.nextPageToken);
+    setHasMoreVideos(!!result.nextPageToken);
+    setCurrentSearchType('related');
     
     console.log('Mostrando videos relacionados normales');
   };
@@ -419,8 +531,11 @@ const VideoPlayer = () => {
           locationName = videoLocationName;
         }
 
-        const relatedVideosData = await fetchRelatedVideos(videoId, locationName);
-        setRelatedVideos(relatedVideosData);
+        const result = await fetchRelatedVideos(videoId, locationName);
+        setRelatedVideos(result.videos);
+        setNextPageToken(result.nextPageToken);
+        setHasMoreVideos(!!result.nextPageToken);
+        setCurrentSearchType('related');
 
       } catch (err) {
         setError(err.message);
@@ -540,6 +655,11 @@ const VideoPlayer = () => {
                   Filtrado por: {selectedCategory.name}
                 </p>
               )}
+              {searchTerm && (
+                <p className="text-sm text-yellow-400 mt-1">
+                  Buscando: "{searchTerm}"
+                </p>
+              )}
             </div>
             
             <div className="flex items-center gap-4">
@@ -556,6 +676,48 @@ const VideoPlayer = () => {
                 Volver al Mapa
               </button>
             </div>
+          </div>
+
+          {/* BUSCADOR - AGREGADO ARRIBA DE LAS CATEGORÍAS */}
+          <div className="mb-4">
+            <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  placeholder="Buscar términos relacionados..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setSearchError('');
+                  }}
+                  className="w-full glass-effect bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 pr-10"
+                />
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+              </div>
+              
+              <button 
+                type="submit" 
+                className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 px-4 py-2 rounded-lg transition-all duration-300"
+              >
+                Buscar
+              </button>
+            </form>
+            
+            {searchError && (
+              <div className="mt-2 bg-red-500/20 border border-red-500/50 rounded-lg p-2 text-red-300 text-sm">
+                {searchError}
+              </div>
+            )}
+            
+            {searchTerm && (
+              <div className="mt-2 text-sm text-gray-400">
+                Buscando "{searchTerm}" en {selectedLocationName || userLocationName || videoLocationName || 'México'}
+              </div>
+            )}
           </div>
 
           <div className="flex justify-center">
@@ -598,20 +760,23 @@ const VideoPlayer = () => {
                   )}
                   {selectedLocationName && (
                     <p className="text-sm text-yellow-400 flex items-center gap-2">
-                      <span>🎯</span>
                       <span>Ubicacion seleccionada: {selectedLocationName}</span>
                     </p>
                   )}
                   {userLocationName && (
                     <p className="text-sm text-blue-400 flex items-center gap-2">
-                      <span>📍</span>
                       <span>Mi ubicacion: {userLocationName}</span>
                     </p>
                   )}
                   {selectedCategory && (
                     <p className="text-sm text-purple-400 flex items-center gap-2">
-                      <span>🎯</span>
                       <span>Categoria: {selectedCategory.name}</span>
+                    </p>
+                  )}
+                  {searchTerm && (
+                    <p className="text-sm text-yellow-400 flex items-center gap-2">
+                      <span>🔍</span>
+                      <span>Buscando: "{searchTerm}"</span>
                     </p>
                   )}
                 </div>
@@ -795,6 +960,11 @@ const VideoPlayer = () => {
                     Filtrado por: {selectedCategory.name}
                   </p>
                 )}
+                {searchTerm && (
+                  <p className="text-sm text-yellow-400 mt-1">
+                    Buscando: "{searchTerm}"
+                  </p>
+                )}
               </div>
               <div className="h-80">
                 <Map
@@ -897,13 +1067,18 @@ const VideoPlayer = () => {
               <div className="p-4 border-b border-gray-700">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold text-cyan-400 text-lg">
-                    {selectedCategory ? `Videos de ${selectedCategory.name}` : 'Videos Relacionados'}
+                    {selectedCategory 
+                      ? `Videos de ${selectedCategory.name}` 
+                      : searchTerm 
+                        ? `Resultados: "${searchTerm}"` 
+                        : 'Videos Relacionados'
+                    }
                   </h3>
-                  {selectedCategory && (
+                  {(selectedCategory || searchTerm) && (
                     <button
                       onClick={clearCategorySelection}
                       className="text-xs bg-red-500 hover:bg-red-600 px-2 py-1 rounded text-white transition-colors"
-                      title="Quitar filtro de categoria"
+                      title="Quitar filtro"
                     >
                       ✕
                     </button>
@@ -914,62 +1089,91 @@ const VideoPlayer = () => {
                     Mostrando contenido de {selectedCategory.name.toLowerCase()}
                   </p>
                 )}
+                {searchTerm && (
+                  <p className="text-sm text-yellow-400 mt-1">
+                    Buscando en {selectedLocationName || userLocationName || videoLocationName || 'México'}
+                  </p>
+                )}
               </div>
               <div className="max-h-96 overflow-y-auto">
                 {relatedVideos.length > 0 ? (
-                  relatedVideos.map((video) => (
-                    <div
-                      key={video.youtube_video_id}
-                      onClick={() => navigate(`/video/${video.youtube_video_id}`, { 
-                        state: { 
-                          selectedLocation: selectedLocation ? { 
-                            latitude: selectedLocation.latitude, 
-                            longitude: selectedLocation.longitude, 
-                            name: selectedLocationName 
-                          } : null
-                        }
-                      })}
-                      className="p-4 border-b border-gray-700 hover:bg-gray-700/30 cursor-pointer transition-all duration-300 group"
-                    >
-                      <div className="flex gap-4">
-                        <div className="flex-shrink-0 relative">
-                          <img
-                            src={`https://img.youtube.com/vi/${video.youtube_video_id}/mqdefault.jpg`}
-                            alt="Thumbnail"
-                            className="w-20 h-14 rounded-lg object-cover group-hover:scale-105 transition-transform duration-300"
-                            onError={(e) => {
-                              e.target.src = 'https://via.placeholder.com/80x56/1f2937/6b7280?text=Video';
-                            }}
-                          />
-                          {video.searchCategory && video.searchCategory !== 'general' && (
-                            <div className="absolute -top-1 -right-1 bg-purple-500 text-white text-xs px-1 rounded">
-                              {video.searchCategory.charAt(0)}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-white text-sm line-clamp-2 group-hover:text-cyan-300 transition-colors">
-                            {video.title}
-                          </p>
-                          <p className="text-xs text-gray-400 mt-1">
-                            {video.channelTitle}
-                          </p>
-                          <p className="text-xs text-cyan-400 mt-1">
-                            {getTimeSincePublished(video.publishedAt)}
-                          </p>
+                  <>
+                    {relatedVideos.map((video) => (
+                      <div
+                        key={video.youtube_video_id}
+                        onClick={() => navigate(`/video/${video.youtube_video_id}`, { 
+                          state: { 
+                            selectedLocation: selectedLocation ? { 
+                              latitude: selectedLocation.latitude, 
+                              longitude: selectedLocation.longitude, 
+                              name: selectedLocationName 
+                            } : null
+                          }
+                        })}
+                        className="p-4 border-b border-gray-700 hover:bg-gray-700/30 cursor-pointer transition-all duration-300 group"
+                      >
+                        <div className="flex gap-4">
+                          <div className="flex-shrink-0 relative">
+                            <img
+                              src={`https://img.youtube.com/vi/${video.youtube_video_id}/mqdefault.jpg`}
+                              alt="Thumbnail"
+                              className="w-20 h-14 rounded-lg object-cover group-hover:scale-105 transition-transform duration-300"
+                              onError={(e) => {
+                                e.target.src = 'https://via.placeholder.com/80x56/1f2937/6b7280?text=Video';
+                              }}
+                            />
+                            {video.searchCategory && video.searchCategory !== 'general' && (
+                              <div className="absolute -top-1 -right-1 bg-purple-500 text-white text-xs px-1 rounded">
+                                {video.searchCategory.charAt(0)}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-white text-sm line-clamp-2 group-hover:text-cyan-300 transition-colors">
+                              {video.title}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              {video.channelTitle}
+                            </p>
+                            <p className="text-xs text-cyan-400 mt-1">
+                              {getTimeSincePublished(video.publishedAt)}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))
+                    ))}
+                    
+                    {/* BOTÓN MOSTRAR MÁS VIDEOS - AGREGADO */}
+                    {hasMoreVideos && (
+                      <div className="flex justify-center mt-4 mb-4">
+                        <button
+                          onClick={loadMoreVideos}
+                          disabled={isLoadingMore}
+                          className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-2 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg text-sm"
+                        >
+                          {isLoadingMore ? (
+                            <div className="flex items-center gap-2">
+                              <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></span>
+                              Cargando...
+                            </div>
+                          ) : (
+                            'Mostrar más videos'
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="p-6 text-center">
                     <p className="text-gray-400">
                       {selectedCategory 
                         ? `No hay videos de ${selectedCategory.name} disponibles` 
-                        : 'No hay videos relacionados disponibles'
+                        : searchTerm
+                          ? `No hay resultados para "${searchTerm}"`
+                          : 'No hay videos relacionados disponibles'
                       }
                     </p>
-                    {selectedCategory && (
+                    {(selectedCategory || searchTerm) && (
                       <button
                         onClick={clearCategorySelection}
                         className="text-cyan-400 text-sm mt-2 hover:text-cyan-300"
