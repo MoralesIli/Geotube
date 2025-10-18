@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import YouTube from 'react-youtube';
 import Map, { Marker, NavigationControl, Popup } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -7,6 +7,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 const VideoPlayer = () => {
   const { videoId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [videoData, setVideoData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -25,9 +26,85 @@ const VideoPlayer = () => {
   const [showVideoLocation, setShowVideoLocation] = useState(false);
   const [videoTags, setVideoTags] = useState([]);
   const [videoCategory, setVideoCategory] = useState('');
+  
+  // Nuevo estado para la ubicación seleccionada desde MainApp
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [selectedLocationName, setSelectedLocationName] = useState('');
 
-  const MAPBOX_TOKEN = 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
-  const YOUTUBE_API_KEY = 'AIzaSyAmkc92taptBHHwQsQdOJiGW7Wktghl-OI';
+  const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN || 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
+  const YOUTUBE_API_KEY = process.env.REACT_APP_YOUTUBE_API_KEY || 'AIzaSyAmkc92taptBHHwQsQdOJiGW7Wktghl-OI';
+
+  // Categorías para mostrar en el header (igual que en MainApp)
+  const categories = [
+    {
+      id: 'cultura',
+      name: 'Cultura',
+      color: 'from-purple-500 to-pink-500',
+      bgColor: 'bg-gradient-to-r from-purple-500 to-pink-500'
+    },
+    {
+      id: 'gastronomia',
+      name: 'Gastronomía',
+      color: 'from-orange-500 to-red-500',
+      bgColor: 'bg-gradient-to-r from-orange-500 to-red-500'
+    },
+    {
+      id: 'naturaleza',
+      name: 'Naturaleza',
+      color: 'from-green-500 to-emerald-500',
+      bgColor: 'bg-gradient-to-r from-green-500 to-emerald-500'
+    },
+    {
+      id: 'historia',
+      name: 'Historia',
+      color: 'from-amber-500 to-yellow-500',
+      bgColor: 'bg-gradient-to-r from-amber-500 to-yellow-500'
+    },
+    {
+      id: 'entretenimiento',
+      name: 'Entretenimiento',
+      color: 'from-blue-500 to-cyan-500',
+      bgColor: 'bg-gradient-to-r from-blue-500 to-cyan-500'
+    }
+  ];
+
+  // Obtener ubicación seleccionada desde MainApp
+  useEffect(() => {
+    // Intentar obtener la ubicación desde el state de navegación
+    if (location.state?.selectedLocation) {
+      const { latitude, longitude, name } = location.state.selectedLocation;
+      setSelectedLocation({ latitude, longitude });
+      setSelectedLocationName(name);
+      
+      // Centrar el mapa en la ubicación seleccionada
+      setViewport({
+        latitude: latitude,
+        longitude: longitude,
+        zoom: 12
+      });
+    }
+
+    // También verificar en localStorage como fallback
+    const savedSelectedLocation = localStorage.getItem('selectedLocation');
+    if (savedSelectedLocation) {
+      try {
+        const locationData = JSON.parse(savedSelectedLocation);
+        setSelectedLocation({ 
+          latitude: locationData.latitude, 
+          longitude: locationData.longitude 
+        });
+        setSelectedLocationName(locationData.name);
+        
+        setViewport({
+          latitude: locationData.latitude,
+          longitude: locationData.longitude,
+          zoom: 12
+        });
+      } catch (error) {
+        console.error('Error parsing selected location:', error);
+      }
+    }
+  }, [location]);
 
   // Verificar autenticación
   useEffect(() => {
@@ -249,11 +326,14 @@ const VideoPlayer = () => {
               setVideoLocationName(locationCoords.name);
               setShowVideoLocation(true);
               
-              setViewport({
-                latitude: locationCoords.latitude,
-                longitude: locationCoords.longitude,
-                zoom: 10
-              });
+              // Si no hay ubicación seleccionada, usar la del video
+              if (!selectedLocation) {
+                setViewport({
+                  latitude: locationCoords.latitude,
+                  longitude: locationCoords.longitude,
+                  zoom: 10
+                });
+              }
             }
           }
         }
@@ -273,7 +353,7 @@ const VideoPlayer = () => {
     if (videoId) {
       initializeData();
     }
-  }, [videoId, fetchVideoStatistics, getCategoryName, extractLocationFromDescription, getLocationCoordinates, fetchRelatedVideos]);
+  }, [videoId, fetchVideoStatistics, getCategoryName, extractLocationFromDescription, getLocationCoordinates, fetchRelatedVideos, selectedLocation]);
 
   // Configuración de YouTube
   const youtubeOpts = {
@@ -369,32 +449,52 @@ const VideoPlayer = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 text-white">
-      {/* Header Profesional */}
+      {/* Header Profesional Mejorado */}
       <header className="glass-effect border-b border-gray-700 p-4 bg-gray-800/80 backdrop-blur-sm">
-        <div className="container mx-auto flex items-center justify-between">
-          <div 
-            onClick={handleBackToMap}
-            className="cursor-pointer group"
-          >
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent group-hover:from-cyan-300 group-hover:to-blue-400 transition-all duration-300">
-              VideoMap Pro
-            </h1>
-            <p className="text-sm text-gray-400">Reproductor de Video</p>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            {userLocationName && (
-              <div className="text-right">
-                <p className="text-sm text-cyan-400">Ubicación actual</p>
-                <p className="text-xs text-gray-300">{userLocationName}</p>
-              </div>
-            )}
-            <button 
+        <div className="container mx-auto">
+          {/* Primera fila: Logo y botones principales */}
+          <div className="flex items-center justify-between mb-4">
+            <div 
               onClick={handleBackToMap}
-              className="bg-gradient-to-r from-gray-700 to-gray-600 px-6 py-2 rounded-lg hover:from-gray-600 hover:to-gray-500 transition-all duration-300 border border-gray-600 hover:border-gray-500"
+              className="cursor-pointer group"
             >
-              Volver al Mapa
-            </button>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent group-hover:from-cyan-300 group-hover:to-blue-400 transition-all duration-300">
+                VideoMap Pro
+              </h1>
+              <p className="text-sm text-gray-400">Reproductor de Video</p>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              {userLocationName && (
+                <div className="text-right">
+                  <p className="text-sm text-cyan-400">Ubicación actual</p>
+                  <p className="text-xs text-gray-300">{userLocationName}</p>
+                </div>
+              )}
+              <button 
+                onClick={handleBackToMap}
+                className="bg-gradient-to-r from-gray-700 to-gray-600 px-6 py-2 rounded-lg hover:from-gray-600 hover:to-gray-500 transition-all duration-300 border border-gray-600 hover:border-gray-500"
+              >
+                Volver al Mapa
+              </button>
+            </div>
+          </div>
+
+          {/* Segunda fila: Categorías en columnas */}
+          <div className="flex justify-center">
+            <div className="grid grid-cols-5 gap-2 w-full max-w-4xl">
+              {categories.map((category) => (
+                <div
+                  key={category.id}
+                  className={`text-center p-2 rounded-lg cursor-pointer transition-all duration-300 transform hover:scale-105 ${category.bgColor} bg-gradient-to-r shadow-lg border border-white/20`}
+                  title={category.name}
+                >
+                  <span className="text-white text-sm font-medium whitespace-nowrap">
+                    {category.name}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </header>
@@ -408,12 +508,20 @@ const VideoPlayer = () => {
             <div className="glass-effect rounded-2xl overflow-hidden border border-gray-700 shadow-2xl bg-gray-800/50">
               <div className="p-4 border-b border-gray-700">
                 <h2 className="text-xl font-semibold text-cyan-400">Reproduciendo Video</h2>
-                {showVideoLocation && (
-                  <p className="text-sm text-green-400 mt-1 flex items-center gap-2">
-                    <span>📍</span>
-                    <span>Ubicación detectada: {videoLocationName}</span>
-                  </p>
-                )}
+                <div className="flex flex-wrap gap-4 mt-2">
+                  {showVideoLocation && (
+                    <p className="text-sm text-green-400 flex items-center gap-2">
+                      <span>📍</span>
+                      <span>Ubicación del video: {videoLocationName}</span>
+                    </p>
+                  )}
+                  {selectedLocationName && (
+                    <p className="text-sm text-yellow-400 flex items-center gap-2">
+                      <span>🎯</span>
+                      <span>Ubicación seleccionada: {selectedLocationName}</span>
+                    </p>
+                  )}
+                </div>
               </div>
               <div className="bg-black">
                 <YouTube videoId={videoId} opts={youtubeOpts} />
@@ -457,11 +565,37 @@ const VideoPlayer = () => {
                 )}
               </div>
 
-              {/* Información de Ubicación */}
+              {/* Información de Ubicación Seleccionada */}
+              {selectedLocationName && (
+                <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-xl p-4 mb-6 border border-yellow-500/30">
+                  <h3 className="font-semibold mb-3 text-yellow-400 text-lg flex items-center gap-2">
+                    🎯 Ubicación Seleccionada desde el Mapa
+                  </h3>
+                  <p className="text-white text-lg mb-2">{selectedLocationName}</p>
+                  <div className="flex items-center gap-4 text-sm text-gray-300">
+                    <span>Lat: {selectedLocation?.latitude.toFixed(4)}</span>
+                    <span>Lng: {selectedLocation?.longitude.toFixed(4)}</span>
+                    <button 
+                      onClick={() => {
+                        setViewport({
+                          latitude: selectedLocation.latitude,
+                          longitude: selectedLocation.longitude,
+                          zoom: 12
+                        });
+                      }}
+                      className="ml-auto bg-yellow-500 hover:bg-yellow-600 px-3 py-1 rounded text-xs transition-colors text-white"
+                    >
+                      Centrar en Mapa
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Información de Ubicación del Video */}
               {showVideoLocation && (
                 <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-xl p-4 mb-6 border border-green-500/30">
                   <h3 className="font-semibold mb-3 text-green-400 text-lg flex items-center gap-2">
-                    📍 Información de Ubicación
+                    📍 Información de Ubicación del Video
                   </h3>
                   <p className="text-white text-lg mb-2">{videoLocationName}</p>
                   <div className="flex items-center gap-4 text-sm text-gray-300">
@@ -570,7 +704,7 @@ const VideoPlayer = () => {
             <div className="glass-effect rounded-2xl overflow-hidden border border-gray-700 bg-gray-800/50">
               <div className="p-4 border-b border-gray-700">
                 <h3 className="font-semibold text-cyan-400 text-lg">
-                  {showVideoLocation ? 'Ubicación del Video' : 'Mapa'}
+                  {showVideoLocation || selectedLocation ? 'Ubicaciones' : 'Mapa'}
                 </h3>
               </div>
               <div className="h-80">
@@ -582,6 +716,24 @@ const VideoPlayer = () => {
                   mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
                 >
                   <NavigationControl position="top-right" />
+                  
+                  {/* Marcador de ubicación seleccionada */}
+                  {selectedLocation && (
+                    <Marker
+                      latitude={selectedLocation.latitude}
+                      longitude={selectedLocation.longitude}
+                    >
+                      <div className="cursor-pointer">
+                        <div className="relative">
+                          <div className="h-8 w-8 bg-gradient-to-r from-yellow-500 to-orange-500 border-2 border-white rounded-full animate-ping absolute"></div>
+                          <div className="h-6 w-6 bg-gradient-to-r from-yellow-500 to-orange-500 border-2 border-white rounded-full relative"></div>
+                          <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                            Seleccionada
+                          </div>
+                        </div>
+                      </div>
+                    </Marker>
+                  )}
                   
                   {/* Marcador de ubicación del video */}
                   {showVideoLocation && videoLocation && (
@@ -621,6 +773,12 @@ const VideoPlayer = () => {
               </div>
               <div className="p-4 border-t border-gray-700">
                 <div className="space-y-2">
+                  {selectedLocation && (
+                    <div className="flex items-center gap-2">
+                      <div className="h-3 w-3 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full animate-pulse"></div>
+                      <span className="text-sm">Ubicación seleccionada: {selectedLocationName}</span>
+                    </div>
+                  )}
                   {showVideoLocation && (
                     <div className="flex items-center gap-2">
                       <div className="h-3 w-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full animate-pulse"></div>
@@ -633,7 +791,7 @@ const VideoPlayer = () => {
                       <span className="text-sm">Tu ubicación: {userLocationName}</span>
                     </div>
                   )}
-                  {!showVideoLocation && !userLocation && (
+                  {!showVideoLocation && !userLocation && !selectedLocation && (
                     <div className="text-center text-gray-400 text-sm">
                       No se detectó ubicación específica para este video
                     </div>
@@ -652,7 +810,13 @@ const VideoPlayer = () => {
                   relatedVideos.map((video) => (
                     <div
                       key={video.youtube_video_id}
-                      onClick={() => navigate(`/video/${video.youtube_video_id}`)}
+                      onClick={() => navigate(`/video/${video.youtube_video_id}`, { 
+                        state: { selectedLocation: selectedLocation ? { 
+                          latitude: selectedLocation.latitude, 
+                          longitude: selectedLocation.longitude, 
+                          name: selectedLocationName 
+                        } : null }
+                      })}
                       className="p-4 border-b border-gray-700 hover:bg-gray-700/30 cursor-pointer transition-all duration-300 group"
                     >
                       <div className="flex gap-4">
