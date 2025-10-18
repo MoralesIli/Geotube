@@ -32,6 +32,11 @@ const MainApp = () => {
   const [nextPageToken, setNextPageToken] = useState('');
   const [searchLocation, setSearchLocation] = useState(null);
 
+  // NUEVOS ESTADOS PARA PAGINACIÓN
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMoreVideos, setHasMoreVideos] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
   // Estados para geolocalización
   const [clickedLocation, setClickedLocation] = useState(null);
   const [clickedLocationName, setClickedLocationName] = useState('');
@@ -586,10 +591,14 @@ const MainApp = () => {
     }
   };
 
-  // BUSCAR VIDEOS POR CATEGORÍA CON VERIFICACIÓN DE RESTRICCIONES
-  const searchVideosByCategory = async (category) => {
-    setLoadingVideos(true);
-    setSelectedCategory(category);
+  // BUSCAR VIDEOS POR CATEGORÍA CON VERIFICACIÓN DE RESTRICCIONES - MODIFICADA PARA PAGINACIÓN
+  const searchVideosByCategory = async (category, pageToken = '', isLoadMore = false) => {
+    if (!isLoadMore) {
+      setLoadingVideos(true);
+      setSelectedCategory(category);
+    } else {
+      setIsLoadingMore(true);
+    }
     
     try {
       let searchQuery;
@@ -606,8 +615,9 @@ const MainApp = () => {
         longitude = userLocation.longitude;
         locationName = userLocationName;
       } else {
-        alert('Primero activa tu ubicación o haz clic en una ubicación válida en el mapa');
-        setLoadingVideos(false);
+        if (!isLoadMore) {
+          alert('Primero activa tu ubicación o haz clic en una ubicación válida en el mapa');
+        }
         return;
       }
 
@@ -619,8 +629,9 @@ const MainApp = () => {
       });
       
       if (restrictionCheck.restricted) {
-        alert(restrictionCheck.message);
-        setLoadingVideos(false);
+        if (!isLoadMore) {
+          alert(restrictionCheck.message);
+        }
         return;
       }
 
@@ -632,20 +643,31 @@ const MainApp = () => {
         latitude,
         longitude,
         locationName,
-        searchQuery
+        searchQuery,
+        pageToken
       );
       
       if (result.videos.length > 0) {
-        setVideos(result.videos);
+        if (isLoadMore) {
+          setVideos(prev => [...prev, ...result.videos]);
+        } else {
+          setVideos(result.videos);
+          setCurrentPage(1);
+        }
+        
         setNextPageToken(result.nextPageToken);
-        setActiveFilter('category');
-        setSearchLocation({
-          latitude: latitude,
-          longitude: longitude,
-          name: locationName
-        });
-        setShowLocationPopup(false);
-      } else {
+        setHasMoreVideos(!!result.nextPageToken);
+        
+        if (!isLoadMore) {
+          setActiveFilter('category');
+          setSearchLocation({
+            latitude: latitude,
+            longitude: longitude,
+            name: locationName
+          });
+          setShowLocationPopup(false);
+        }
+      } else if (!isLoadMore) {
         // Intentar con otra palabra clave si la primera no funciona
         const fallbackKeyword = category.keywords.find(k => k !== randomKeyword) || category.keywords[0];
         const fallbackQuery = `${locationName} ${fallbackKeyword}`;
@@ -660,6 +682,7 @@ const MainApp = () => {
         if (fallbackResult.videos.length > 0) {
           setVideos(fallbackResult.videos);
           setNextPageToken(fallbackResult.nextPageToken);
+          setHasMoreVideos(!!fallbackResult.nextPageToken);
           setActiveFilter('category');
           setSearchLocation({
             latitude: latitude,
@@ -673,9 +696,15 @@ const MainApp = () => {
       }
     } catch (error) {
       console.error('Error buscando videos por categoría:', error);
-      alert('Error al buscar videos para esta categoría');
+      if (!isLoadMore) {
+        alert('Error al buscar videos para esta categoría');
+      }
     } finally {
-      setLoadingVideos(false);
+      if (isLoadMore) {
+        setIsLoadingMore(false);
+      } else {
+        setLoadingVideos(false);
+      }
     }
   };
 
@@ -694,6 +723,7 @@ const MainApp = () => {
       if (result.videos.length > 0) {
         setVideos(result.videos);
         setNextPageToken(result.nextPageToken);
+        setHasMoreVideos(!!result.nextPageToken);
         setActiveFilter('clicked');
         setSearchLocation({
           latitude: clickedLocation.latitude,
@@ -878,7 +908,7 @@ const MainApp = () => {
     }
   }, [MAPBOX_TOKEN]);
 
-  // Función principal de búsqueda de videos
+  // Función principal de búsqueda de videos - MODIFICADA PARA PAGINACIÓN
   const searchYouTubeVideosByLocation = useCallback(async (latitude, longitude, locationName, query = '', pageToken = '') => {
     try {
       const searchQuery = query || locationName.split(',')[0].trim();
@@ -984,6 +1014,7 @@ const MainApp = () => {
         setVideos(popularVideos);
         setActiveFilter('mexico');
         setNextPageToken('');
+        setHasMoreVideos(false);
         return popularVideos;
       } else {
         if (response.status === 403) {
@@ -1012,6 +1043,7 @@ const MainApp = () => {
       if (result.videos.length > 0) {
         setVideos(result.videos);
         setNextPageToken(result.nextPageToken);
+        setHasMoreVideos(!!result.nextPageToken);
         setActiveFilter(isSearch ? 'search' : 'current');
         setSearchLocation(isSearch ? { latitude, longitude, name: locationName } : null);
       } else {
@@ -1157,6 +1189,7 @@ const MainApp = () => {
       if (result.videos.length > 0) {
         setVideos(result.videos);
         setNextPageToken(result.nextPageToken);
+        setHasMoreVideos(!!result.nextPageToken);
         setActiveFilter('other');
       } else {
         await loadVideosForLocation(userLocation.latitude, userLocation.longitude, locationName);
@@ -1171,14 +1204,19 @@ const MainApp = () => {
     }
   }, [userLocation, userLocationName, getLocationName, searchYouTubeVideosByLocation, loadVideosForLocation, checkRestrictions]);
 
-  // BÚSQUEDA MEJORADA CON VERIFICACIÓN COMPLETA DE RESTRICCIONES
-  const fetchVideos = useCallback(async (query, pageToken = '') => {
-    if (!query.trim()) {
+  // BÚSQUEDA MEJORADA CON VERIFICACIÓN COMPLETA DE RESTRICCIONES - MODIFICADA PARA PAGINACIÓN
+  const fetchVideos = useCallback(async (query, pageToken = '', isLoadMore = false) => {
+    if (!query.trim() && !isLoadMore) {
       setSearchError('Por favor ingresa un término de búsqueda válido.');
       return;
     }
 
-    setLoadingVideos(true);
+    if (isLoadMore) {
+      setIsLoadingMore(true);
+    } else {
+      setLoadingVideos(true);
+    }
+    
     setSearchError('');
     
     try {
@@ -1200,7 +1238,6 @@ const MainApp = () => {
         
         if (restrictionCheck.restricted) {
           alert(restrictionCheck.message);
-          setLoadingVideos(false);
           return;
         }
         
@@ -1219,7 +1256,6 @@ const MainApp = () => {
         
         if (restrictionCheck.restricted) {
           alert(restrictionCheck.message);
-          setLoadingVideos(false);
           return;
         }
         
@@ -1235,15 +1271,16 @@ const MainApp = () => {
         const restrictionCheck = checkRestrictions(query, locationData);
         if (restrictionCheck.restricted) {
           alert(restrictionCheck.message);
-          setLoadingVideos(false);
           return;
         }
 
-        setTargetViewport({ 
-          latitude: latitude, 
-          longitude: longitude, 
-          zoom: 10 
-        });
+        if (!isLoadMore) {
+          setTargetViewport({ 
+            latitude: latitude, 
+            longitude: longitude, 
+            zoom: 10 
+          });
+        }
       }
 
       // VERIFICACIÓN FINAL antes de buscar videos
@@ -1255,7 +1292,6 @@ const MainApp = () => {
       
       if (finalRestrictionCheck.restricted) {
         alert(finalRestrictionCheck.message);
-        setLoadingVideos(false);
         return;
       }
 
@@ -1269,37 +1305,99 @@ const MainApp = () => {
       );
 
       if (result.videos.length > 0) {
-        if (pageToken) {
+        if (isLoadMore) {
           setVideos(prev => [...prev, ...result.videos]);
         } else {
           setVideos(result.videos);
+          setCurrentPage(1);
         }
         
         setNextPageToken(result.nextPageToken);
-        setUserLocationName(locationName);
-        setActiveFilter('search');
-        setSearchLocation({
-          latitude: latitude,
-          longitude: longitude,
-          name: locationName
-        });
-        setShowSuggestions(false);
+        setHasMoreVideos(!!result.nextPageToken);
+        
+        if (!isLoadMore) {
+          setUserLocationName(locationName);
+          setActiveFilter('search');
+          setSearchLocation({
+            latitude: latitude,
+            longitude: longitude,
+            name: locationName
+          });
+          setShowSuggestions(false);
+        }
       } else {
-        throw new Error('No se encontraron videos para esta búsqueda');
+        if (!isLoadMore) {
+          throw new Error('No se encontraron videos para esta búsqueda');
+        }
       }
     } catch (error) {
       console.error('Error en búsqueda:', error);
-      setSearchError(error.message || 'Error al realizar la búsqueda. Verifica el término e intenta nuevamente.');
-      
-      if (error.message.includes('Tipo de ubicación no válido')) {
-        setSearchError('Solo se permiten búsquedas de países, ciudades, lugares o direcciones específicas.');
-      } else if (error.message === 'QUOTA_EXCEEDED') {
-        setSearchError('Límite de cuota excedido para YouTube API.');
+      if (!isLoadMore) {
+        setSearchError(error.message || 'Error al realizar la búsqueda. Verifica el término e intenta nuevamente.');
+        
+        if (error.message.includes('Tipo de ubicación no válido')) {
+          setSearchError('Solo se permiten búsquedas de países, ciudades, lugares o direcciones específicas.');
+        } else if (error.message === 'QUOTA_EXCEEDED') {
+          setSearchError('Límite de cuota excedido para YouTube API.');
+        }
       }
     } finally {
-      setLoadingVideos(false);
+      if (isLoadMore) {
+        setIsLoadingMore(false);
+      } else {
+        setLoadingVideos(false);
+      }
     }
   }, [getLocationCoordinates, searchYouTubeVideosByLocation, clickedLocation, isValidLocation, clickedLocationName, userLocation, userLocationName, checkRestrictions]);
+
+  // NUEVA FUNCIÓN PARA CARGAR MÁS VIDEOS
+  const loadMoreVideos = async () => {
+    if (!nextPageToken || isLoadingMore) return;
+
+    try {
+      if (activeFilter === 'search') {
+        await fetchVideos(searchTerm, nextPageToken, true);
+      } else if (activeFilter === 'category' && selectedCategory) {
+        await searchVideosByCategory(selectedCategory, nextPageToken, true);
+      } else if (activeFilter === 'clicked') {
+        const result = await searchYouTubeVideosByLocation(
+          clickedLocation.latitude,
+          clickedLocation.longitude,
+          clickedLocationName,
+          '',
+          nextPageToken
+        );
+        
+        if (result.videos.length > 0) {
+          setVideos(prev => [...prev, ...result.videos]);
+          setNextPageToken(result.nextPageToken);
+          setHasMoreVideos(!!result.nextPageToken);
+        }
+      } else if (activeFilter === 'other' || activeFilter === 'popular' || activeFilter === 'current') {
+        const locationName = userLocationName;
+        const latitude = userLocation.latitude;
+        const longitude = userLocation.longitude;
+        
+        const result = await searchYouTubeVideosByLocation(
+          latitude,
+          longitude,
+          locationName,
+          '',
+          nextPageToken
+        );
+        
+        if (result.videos.length > 0) {
+          setVideos(prev => [...prev, ...result.videos]);
+          setNextPageToken(result.nextPageToken);
+          setHasMoreVideos(!!result.nextPageToken);
+        }
+      }
+      
+      setCurrentPage(prev => prev + 1);
+    } catch (error) {
+      console.error('Error cargando más videos:', error);
+    }
+  };
 
   // Handlers para el buscador con sugerencias
   const handleSearchChange = (e) => {
@@ -2268,6 +2366,26 @@ const MainApp = () => {
                         </div>
                       </div>
                     ))}
+                    
+                    {/* BOTÓN MOSTRAR MÁS VIDEOS - AGREGADO */}
+                    {hasMoreVideos && (
+                      <div className="flex justify-center mt-6 mb-4">
+                        <button
+                          onClick={loadMoreVideos}
+                          disabled={isLoadingMore}
+                          className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-3 px-8 rounded-2xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                        >
+                          {isLoadingMore ? (
+                            <div className="flex items-center gap-2">
+                              <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                              Cargando...
+                            </div>
+                          ) : (
+                            'Mostrar más videos'
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </>
                 ) : (
                   !loadingVideos && (
