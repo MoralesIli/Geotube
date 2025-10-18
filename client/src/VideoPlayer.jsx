@@ -27,86 +27,105 @@ const VideoPlayer = () => {
   const [videoTags, setVideoTags] = useState([]);
   const [videoCategory, setVideoCategory] = useState('');
   
-  // Nuevo estado para la ubicación seleccionada desde MainApp
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [selectedLocationName, setSelectedLocationName] = useState('');
+
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [categoryClickCount, setCategoryClickCount] = useState(0);
 
   const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN || 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
   const YOUTUBE_API_KEY = process.env.REACT_APP_YOUTUBE_API_KEY || 'AIzaSyAmkc92taptBHHwQsQdOJiGW7Wktghl-OI';
 
-  // Categorías para mostrar en el header (igual que en MainApp)
   const categories = [
     {
       id: 'cultura',
       name: 'Cultura',
+      keywords: ['cultura', 'tradiciones', 'costumbres', 'festividades', 'arte'],
       color: 'from-purple-500 to-pink-500',
       bgColor: 'bg-gradient-to-r from-purple-500 to-pink-500'
     },
     {
       id: 'gastronomia',
-      name: 'Gastronomía',
+      name: 'Gastronomia',
+      keywords: ['comida', 'gastronomia', 'platos', 'recetas', 'culinaria'],
       color: 'from-orange-500 to-red-500',
       bgColor: 'bg-gradient-to-r from-orange-500 to-red-500'
     },
     {
       id: 'naturaleza',
       name: 'Naturaleza',
+      keywords: ['naturaleza', 'paisajes', 'playas', 'montañas', 'parques'],
       color: 'from-green-500 to-emerald-500',
       bgColor: 'bg-gradient-to-r from-green-500 to-emerald-500'
     },
     {
       id: 'historia',
       name: 'Historia',
+      keywords: ['historia', 'museos', 'patrimonio', 'arqueologia', 'antiguo'],
       color: 'from-amber-500 to-yellow-500',
       bgColor: 'bg-gradient-to-r from-amber-500 to-yellow-500'
     },
     {
       id: 'entretenimiento',
       name: 'Entretenimiento',
+      keywords: ['entretenimiento', 'musica', 'festivales', 'eventos', 'diversion'],
       color: 'from-blue-500 to-cyan-500',
       bgColor: 'bg-gradient-to-r from-blue-500 to-cyan-500'
     }
   ];
 
-  // Obtener ubicación seleccionada desde MainApp
   useEffect(() => {
-    // Intentar obtener la ubicación desde el state de navegación
+    console.log('Location state recibido:', location.state);
+    
+    // SOLO establecer ubicacion seleccionada si viene explicitamente del state
     if (location.state?.selectedLocation) {
       const { latitude, longitude, name } = location.state.selectedLocation;
       setSelectedLocation({ latitude, longitude });
       setSelectedLocationName(name);
       
-      // Centrar el mapa en la ubicación seleccionada
       setViewport({
         latitude: latitude,
         longitude: longitude,
         zoom: 12
       });
+      console.log('Ubicacion seleccionada establecida desde MainApp');
+    } else {
+      // Limpiar ubicacion seleccionada si no viene del state
+      setSelectedLocation(null);
+      setSelectedLocationName('');
+      console.log('No hay ubicacion seleccionada desde MainApp');
     }
 
-    // También verificar en localStorage como fallback
-    const savedSelectedLocation = localStorage.getItem('selectedLocation');
-    if (savedSelectedLocation) {
+    // SIEMPRE cargar la ubicacion actual del usuario
+    const savedUserLocation = localStorage.getItem('userLocation');
+    if (savedUserLocation) {
       try {
-        const locationData = JSON.parse(savedSelectedLocation);
-        setSelectedLocation({ 
+        const locationData = JSON.parse(savedUserLocation);
+        setUserLocation({ 
           latitude: locationData.latitude, 
           longitude: locationData.longitude 
         });
-        setSelectedLocationName(locationData.name);
+        setUserLocationName(locationData.name || 'Mi ubicacion actual');
         
-        setViewport({
-          latitude: locationData.latitude,
-          longitude: locationData.longitude,
-          zoom: 12
-        });
+        console.log('Ubicacion actual del usuario cargada:', locationData);
+        
+        // Si no hay ubicacion seleccionada, centrar en la ubicacion del usuario
+        if (!location.state?.selectedLocation) {
+          setViewport({
+            latitude: locationData.latitude,
+            longitude: locationData.longitude,
+            zoom: 10
+          });
+        }
       } catch (error) {
-        console.error('Error parsing selected location:', error);
+        console.error('Error parsing user location:', error);
       }
     }
+
+    // NO usar localStorage como fallback para selectedLocation
+    // Solo usar lo que viene explicitamente del state de navegacion
   }, [location]);
 
-  // Verificar autenticación
   useEffect(() => {
     const userData = localStorage.getItem('user');
     if (!userData) {
@@ -114,13 +133,12 @@ const VideoPlayer = () => {
     }
   }, []);
 
-  // Función optimizada para extraer ubicación de la descripción
   const extractLocationFromDescription = useCallback((description) => {
     if (!description) return null;
     
     const locationPatterns = [
-      /(Ciudad de México|CDMX|Mexico City)/i,
-      /(Cancún|Cancun)/i,
+      /(Ciudad de Mexico|CDMX|Mexico City)/i,
+      /(Cancun|Cancun)/i,
       /(Guadalajara)/i,
       /(Monterrey)/i,
       /(Playa del Carmen)/i,
@@ -128,13 +146,13 @@ const VideoPlayer = () => {
       /(Oaxaca)/i,
       /(Puerto Vallarta)/i,
       /(Los Cabos|Cabo San Lucas)/i,
-      /(Mazatlán|Mazatlan)/i,
+      /(Mazatlan|Mazatlan)/i,
       /(Acapulco)/i,
       /(Chihuahua)/i,
-      /(Mérida|Merida)/i,
+      /(Merida|Merida)/i,
       /(Puebla)/i,
-      /(Querétaro|Queretaro)/i,
-      /(San Luis Potosí|San Luis Potosi)/i,
+      /(Queretaro|Queretaro)/i,
+      /(San Luis Potosi|San Luis Potosi)/i,
       /(Tijuana)/i,
       /(Veracruz)/i,
       /(Zacatecas)/i,
@@ -144,12 +162,12 @@ const VideoPlayer = () => {
       /(Cuernavaca)/i,
       /(Toluca)/i,
       /(Chiapas)/i,
-      /(Yucatán|Yucatan)/i,
+      /(Yucatan|Yucatan)/i,
       /(Quintana Roo)/i,
       /(Baja California)/i,
       /(Sonora)/i,
       /(Jalisco)/i,
-      /(Nuevo León|Nuevo Leon)/i
+      /(Nuevo Leon|Nuevo Leon)/i
     ];
 
     for (const pattern of locationPatterns) {
@@ -160,7 +178,6 @@ const VideoPlayer = () => {
     return null;
   }, []);
 
-  // Función optimizada para obtener coordenadas
   const getLocationCoordinates = useCallback(async (locationName) => {
     try {
       const response = await fetch(
@@ -180,7 +197,6 @@ const VideoPlayer = () => {
     return null;
   }, [MAPBOX_TOKEN]);
 
-  // Función optimizada para obtener estadísticas del video
   const fetchVideoStatistics = useCallback(async (videoId) => {
     try {
       const response = await fetch(
@@ -208,12 +224,11 @@ const VideoPlayer = () => {
         }
       }
     } catch (error) {
-      console.error('Error obteniendo estadísticas:', error);
+      console.error('Error obteniendo estadisticas:', error);
     }
     return null;
   }, [YOUTUBE_API_KEY]);
 
-  // Función para obtener nombre de categoría
   const getCategoryName = useCallback((categoryId) => {
     const categories = {
       '1': 'Film & Animation',
@@ -253,11 +268,20 @@ const VideoPlayer = () => {
     return categories[categoryId] || 'Unknown Category';
   }, []);
 
-  // Función optimizada para cargar videos relacionados
-  const fetchRelatedVideos = useCallback(async (currentVideoId, locationName) => {
+  const fetchRelatedVideos = useCallback(async (currentVideoId, locationName, category = null) => {
     try {
       const currentVideoData = await fetchVideoStatistics(currentVideoId);
-      const searchQuery = currentVideoData?.channelTitle || locationName || 'México';
+      
+      let searchQuery;
+      
+      if (category) {
+        const randomKeyword = category.keywords[Math.floor(Math.random() * category.keywords.length)];
+        searchQuery = `${locationName} ${randomKeyword}`;
+        console.log(`Buscando videos por categoria ${category.name}:`, searchQuery);
+      } else {
+        searchQuery = currentVideoData?.channelTitle || locationName || 'Mexico';
+        console.log('Busqueda normal de videos relacionados:', searchQuery);
+      }
 
       const response = await fetch(
         `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&relevanceLanguage=es&q=${encodeURIComponent(searchQuery)}&key=${YOUTUBE_API_KEY}`
@@ -266,15 +290,19 @@ const VideoPlayer = () => {
       if (response.ok) {
         const data = await response.json();
         
-        return data.items
+        const relatedVideos = data.items
           .filter(item => item.id.videoId !== currentVideoId)
           .map(item => ({
             youtube_video_id: item.id.videoId,
             title: item.snippet.title,
             channelTitle: item.snippet.channelTitle,
             thumbnail: item.snippet.thumbnails.default.url,
-            publishedAt: item.snippet.publishedAt
+            publishedAt: item.snippet.publishedAt,
+            searchCategory: category?.name || 'general'
           }));
+
+        console.log(`${relatedVideos.length} videos relacionados encontrados`);
+        return relatedVideos;
       }
       return [];
     } catch (error) {
@@ -283,27 +311,71 @@ const VideoPlayer = () => {
     }
   }, [YOUTUBE_API_KEY, fetchVideoStatistics]);
 
-  // Inicializar datos del video
+  const handleCategoryClick = (category) => {
+    setCategoryClickCount(prev => {
+      const newCount = prev + 1;
+      
+      if (newCount === 1) {
+        setTimeout(() => {
+          if (categoryClickCount === 0) {
+            selectCategory(category);
+          }
+          setCategoryClickCount(0);
+        }, 300);
+      } 
+      else if (newCount === 2) {
+        clearCategorySelection();
+        setCategoryClickCount(0);
+      }
+      
+      return newCount;
+    });
+  };
+
+  const selectCategory = async (category) => {
+    console.log(`Categoria seleccionada: ${category.name}`);
+    setSelectedCategory(category);
+    
+    // Prioridad para la busqueda: ubicacion seleccionada -> ubicacion actual -> ubicacion del video -> Mexico
+    let locationName = 'Mexico';
+    if (selectedLocationName) {
+      locationName = selectedLocationName;
+    } else if (userLocationName) {
+      locationName = userLocationName;
+    } else if (videoLocationName) {
+      locationName = videoLocationName;
+    }
+
+    const relatedVideosByCategory = await fetchRelatedVideos(videoId, locationName, category);
+    setRelatedVideos(relatedVideosByCategory);
+    
+    console.log(`Mostrando videos de ${category.name} para ${locationName}`);
+  };
+
+  const clearCategorySelection = async () => {
+    console.log('Limpiando seleccion de categoria');
+    setSelectedCategory(null);
+    
+    let locationName = 'Mexico';
+    if (selectedLocationName) {
+      locationName = selectedLocationName;
+    } else if (userLocationName) {
+      locationName = userLocationName;
+    } else if (videoLocationName) {
+      locationName = videoLocationName;
+    }
+
+    const normalRelatedVideos = await fetchRelatedVideos(videoId, locationName);
+    setRelatedVideos(normalRelatedVideos);
+    
+    console.log('Mostrando videos relacionados normales');
+  };
+
   useEffect(() => {
     const initializeData = async () => {
       try {
         setLoading(true);
         
-        // Obtener ubicación del usuario desde localStorage
-        const savedLocation = localStorage.getItem('userLocation');
-        let currentLocationName = 'México';
-
-        if (savedLocation) {
-          const locationData = JSON.parse(savedLocation);
-          setUserLocation({
-            latitude: locationData.latitude,
-            longitude: locationData.longitude
-          });
-          setUserLocationName(locationData.name || 'Tu ubicación actual');
-          currentLocationName = locationData.name || 'Tu ubicación actual';
-        }
-
-        // Obtener datos detallados del video
         const videoDetails = await fetchVideoStatistics(videoId);
         
         if (videoDetails) {
@@ -314,7 +386,6 @@ const VideoPlayer = () => {
           const categoryName = getCategoryName(videoDetails.categoryId);
           setVideoCategory(categoryName);
 
-          // Intentar extraer ubicación del video
           const extractedLocation = extractLocationFromDescription(videoDetails.description);
           if (extractedLocation) {
             const locationCoords = await getLocationCoordinates(extractedLocation);
@@ -326,8 +397,8 @@ const VideoPlayer = () => {
               setVideoLocationName(locationCoords.name);
               setShowVideoLocation(true);
               
-              // Si no hay ubicación seleccionada, usar la del video
-              if (!selectedLocation) {
+              // Solo centrar en ubicacion del video si no hay ubicacion seleccionada NI ubicacion actual
+              if (!selectedLocation && !userLocation) {
                 setViewport({
                   latitude: locationCoords.latitude,
                   longitude: locationCoords.longitude,
@@ -338,8 +409,17 @@ const VideoPlayer = () => {
           }
         }
 
-        // Cargar videos relacionados
-        const relatedVideosData = await fetchRelatedVideos(videoId, currentLocationName);
+        // Determinar ubicacion para busqueda de videos relacionados
+        let locationName = 'Mexico';
+        if (selectedLocationName) {
+          locationName = selectedLocationName;
+        } else if (userLocationName) {
+          locationName = userLocationName;
+        } else if (videoLocationName) {
+          locationName = videoLocationName;
+        }
+
+        const relatedVideosData = await fetchRelatedVideos(videoId, locationName);
         setRelatedVideos(relatedVideosData);
 
       } catch (err) {
@@ -353,9 +433,8 @@ const VideoPlayer = () => {
     if (videoId) {
       initializeData();
     }
-  }, [videoId, fetchVideoStatistics, getCategoryName, extractLocationFromDescription, getLocationCoordinates, fetchRelatedVideos, selectedLocation]);
+  }, [videoId, fetchVideoStatistics, getCategoryName, extractLocationFromDescription, getLocationCoordinates, fetchRelatedVideos, selectedLocation, selectedLocationName, userLocationName, videoLocationName, userLocation]);
 
-  // Configuración de YouTube
   const youtubeOpts = {
     height: '480',
     width: '100%',
@@ -368,7 +447,6 @@ const VideoPlayer = () => {
     },
   };
 
-  // Función para formatear la duración del video
   const formatDuration = useCallback((duration) => {
     const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
     
@@ -382,7 +460,6 @@ const VideoPlayer = () => {
     return `${minutes}:${seconds.padStart(2, '0')}`;
   }, []);
 
-  // Función para formatear números grandes
   const formatLargeNumber = useCallback((num) => {
     if (num >= 1000000) {
       return (num / 1000000).toFixed(1) + 'M';
@@ -392,7 +469,6 @@ const VideoPlayer = () => {
     return num.toString();
   }, []);
 
-  // Función para calcular tiempo desde la publicación
   const getTimeSincePublished = useCallback((publishedAt) => {
     const published = new Date(publishedAt);
     const now = new Date();
@@ -401,7 +477,7 @@ const VideoPlayer = () => {
     
     if (diffInDays < 1) return 'Hoy';
     if (diffInDays === 1) return 'Ayer';
-    if (diffInDays < 7) return `Hace ${diffInDays} días`;
+    if (diffInDays < 7) return `Hace ${diffInDays} dias`;
     if (diffInDays < 30) {
       const weeks = Math.floor(diffInDays / 7);
       return `Hace ${weeks} semana${weeks > 1 ? 's' : ''}`;
@@ -418,14 +494,13 @@ const VideoPlayer = () => {
     navigate('/');
   };
 
-  // Estados de carga y error
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-blue-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-cyan-400 mx-auto mb-4"></div>
           <div className="text-white text-xl font-light">Cargando video...</div>
-          <div className="text-gray-400 text-sm mt-2">Obteniendo información detallada</div>
+          <div className="text-gray-400 text-sm mt-2">Obteniendo informacion detallada</div>
         </div>
       </div>
     );
@@ -449,10 +524,8 @@ const VideoPlayer = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 text-white">
-      {/* Header Profesional Mejorado */}
       <header className="glass-effect border-b border-gray-700 p-4 bg-gray-800/80 backdrop-blur-sm">
         <div className="container mx-auto">
-          {/* Primera fila: Logo y botones principales */}
           <div className="flex items-center justify-between mb-4">
             <div 
               onClick={handleBackToMap}
@@ -462,12 +535,17 @@ const VideoPlayer = () => {
                 VideoMap Pro
               </h1>
               <p className="text-sm text-gray-400">Reproductor de Video</p>
+              {selectedCategory && (
+                <p className="text-sm text-green-400 mt-1">
+                  Filtrado por: {selectedCategory.name}
+                </p>
+              )}
             </div>
             
             <div className="flex items-center gap-4">
               {userLocationName && (
                 <div className="text-right">
-                  <p className="text-sm text-cyan-400">Ubicación actual</p>
+                  <p className="text-sm text-cyan-400">Ubicacion actual</p>
                   <p className="text-xs text-gray-300">{userLocationName}</p>
                 </div>
               )}
@@ -480,17 +558,23 @@ const VideoPlayer = () => {
             </div>
           </div>
 
-          {/* Segunda fila: Categorías en columnas */}
           <div className="flex justify-center">
             <div className="grid grid-cols-5 gap-2 w-full max-w-4xl">
               {categories.map((category) => (
                 <div
                   key={category.id}
-                  className={`text-center p-2 rounded-lg cursor-pointer transition-all duration-300 transform hover:scale-105 ${category.bgColor} bg-gradient-to-r shadow-lg border border-white/20`}
-                  title={category.name}
+                  onClick={() => handleCategoryClick(category)}
+                  onDoubleClick={() => clearCategorySelection()}
+                  className={`text-center p-2 rounded-lg cursor-pointer transition-all duration-300 transform hover:scale-105 ${
+                    selectedCategory?.id === category.id 
+                      ? `ring-4 ring-white ${category.bgColor} shadow-2xl` 
+                      : `${category.bgColor} bg-gradient-to-r shadow-lg border border-white/20`
+                  }`}
+                  title={`Click: Filtrar por ${category.name}\nDoble Click: Quitar filtro`}
                 >
                   <span className="text-white text-sm font-medium whitespace-nowrap">
                     {category.name}
+                    {selectedCategory?.id === category.id && ' ✓'}
                   </span>
                 </div>
               ))}
@@ -499,12 +583,9 @@ const VideoPlayer = () => {
         </div>
       </header>
 
-      {/* Contenido Principal */}
       <div className="container mx-auto p-6">
         <div className="flex flex-col xl:flex-row gap-8">
-          {/* Sección de Video Principal */}
           <div className="xl:w-2/3 space-y-6">
-            {/* Video Player */}
             <div className="glass-effect rounded-2xl overflow-hidden border border-gray-700 shadow-2xl bg-gray-800/50">
               <div className="p-4 border-b border-gray-700">
                 <h2 className="text-xl font-semibold text-cyan-400">Reproduciendo Video</h2>
@@ -512,13 +593,25 @@ const VideoPlayer = () => {
                   {showVideoLocation && (
                     <p className="text-sm text-green-400 flex items-center gap-2">
                       <span>📍</span>
-                      <span>Ubicación del video: {videoLocationName}</span>
+                      <span>Ubicacion del video: {videoLocationName}</span>
                     </p>
                   )}
                   {selectedLocationName && (
                     <p className="text-sm text-yellow-400 flex items-center gap-2">
                       <span>🎯</span>
-                      <span>Ubicación seleccionada: {selectedLocationName}</span>
+                      <span>Ubicacion seleccionada: {selectedLocationName}</span>
+                    </p>
+                  )}
+                  {userLocationName && (
+                    <p className="text-sm text-blue-400 flex items-center gap-2">
+                      <span>📍</span>
+                      <span>Mi ubicacion: {userLocationName}</span>
+                    </p>
+                  )}
+                  {selectedCategory && (
+                    <p className="text-sm text-purple-400 flex items-center gap-2">
+                      <span>🎯</span>
+                      <span>Categoria: {selectedCategory.name}</span>
                     </p>
                   )}
                 </div>
@@ -528,11 +621,9 @@ const VideoPlayer = () => {
               </div>
             </div>
 
-            {/* Información del Video */}
             <div className="glass-effect rounded-2xl p-6 border border-gray-700 bg-gray-800/50">
               <h1 className="text-2xl font-bold mb-3 text-white">{videoData?.title}</h1>
               
-              {/* Estadísticas Principales */}
               <div className="flex flex-wrap items-center gap-4 text-gray-300 mb-6">
                 <div className="flex items-center gap-2">
                   <span className="bg-blue-500/20 px-3 py-1 rounded-full text-sm border border-blue-500/30">
@@ -552,24 +643,24 @@ const VideoPlayer = () => {
                 {videoStats?.duration && (
                   <div className="flex items-center gap-2">
                     <span className="bg-yellow-500/20 px-3 py-1 rounded-full text-sm border border-yellow-500/30">
-                      Duración: {formatDuration(videoStats.duration)}
+                      Duracion: {formatDuration(videoStats.duration)}
                     </span>
                   </div>
                 )}
                 {videoCategory && (
                   <div className="flex items-center gap-2">
                     <span className="bg-pink-500/20 px-3 py-1 rounded-full text-sm border border-pink-500/30">
-                      Categoría: {videoCategory}
+                      Categoria: {videoCategory}
                     </span>
                   </div>
                 )}
               </div>
 
-              {/* Información de Ubicación Seleccionada */}
+              {/* SOLO mostrar ubicacion seleccionada si realmente existe */}
               {selectedLocationName && (
                 <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-xl p-4 mb-6 border border-yellow-500/30">
                   <h3 className="font-semibold mb-3 text-yellow-400 text-lg flex items-center gap-2">
-                    🎯 Ubicación Seleccionada desde el Mapa
+                    Ubicacion Seleccionada desde el Mapa
                   </h3>
                   <p className="text-white text-lg mb-2">{selectedLocationName}</p>
                   <div className="flex items-center gap-4 text-sm text-gray-300">
@@ -591,11 +682,10 @@ const VideoPlayer = () => {
                 </div>
               )}
 
-              {/* Información de Ubicación del Video */}
               {showVideoLocation && (
                 <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-xl p-4 mb-6 border border-green-500/30">
                   <h3 className="font-semibold mb-3 text-green-400 text-lg flex items-center gap-2">
-                    📍 Información de Ubicación del Video
+                    Informacion de Ubicacion del Video
                   </h3>
                   <p className="text-white text-lg mb-2">{videoLocationName}</p>
                   <div className="flex items-center gap-4 text-sm text-gray-300">
@@ -617,9 +707,8 @@ const VideoPlayer = () => {
                 </div>
               )}
 
-              {/* Información del Canal */}
               <div className="bg-gray-800/50 rounded-xl p-4 mb-6 border border-gray-700">
-                <h3 className="font-semibold mb-3 text-cyan-400 text-lg">Información del Canal</h3>
+                <h3 className="font-semibold mb-3 text-cyan-400 text-lg">Informacion del Canal</h3>
                 <p className="text-white text-lg mb-2">{videoData?.channelTitle}</p>
                 <div className="flex items-center gap-4 text-sm text-gray-400">
                   <span>Publicado: {getTimeSincePublished(videoData?.publishedAt)}</span>
@@ -634,15 +723,14 @@ const VideoPlayer = () => {
                 </div>
                 {userLocationName && (
                   <p className="text-gray-400 text-sm mt-2">
-                    📍 Tu ubicación actual: {userLocationName}
+                    Mi ubicacion actual: {userLocationName}
                   </p>
                 )}
               </div>
 
-              {/* Descripción del Video */}
               {videoData?.description && (
                 <div className="bg-gray-800/50 rounded-xl p-4 mb-6 border border-gray-700">
-                  <h3 className="font-semibold mb-3 text-cyan-400 text-lg">Descripción</h3>
+                  <h3 className="font-semibold mb-3 text-cyan-400 text-lg">Descripcion</h3>
                   <p className="text-gray-300 whitespace-pre-wrap">
                     {videoData.description.length > 400 
                       ? `${videoData.description.substring(0, 400)}...` 
@@ -651,13 +739,12 @@ const VideoPlayer = () => {
                   </p>
                   {videoData.description.length > 400 && (
                     <button className="text-cyan-400 text-sm mt-2 hover:text-cyan-300">
-                      Ver descripción completa
+                      Ver descripcion completa
                     </button>
                   )}
                 </div>
               )}
 
-              {/* Etiquetas del Video */}
               {videoTags.length > 0 && (
                 <div className="bg-gray-800/50 rounded-xl p-4 mb-6 border border-gray-700">
                   <h3 className="font-semibold mb-3 text-cyan-400 text-lg">Etiquetas</h3>
@@ -674,7 +761,6 @@ const VideoPlayer = () => {
                 </div>
               )}
 
-              {/* Estadísticas Avanzadas */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                 <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-xl p-4 border border-blue-500/20 text-center">
                   <div className="text-2xl font-bold text-cyan-400">{formatLargeNumber(videoStats?.viewCount)}</div>
@@ -698,14 +784,17 @@ const VideoPlayer = () => {
             </div>
           </div>
 
-          {/* Sidebar - Mapa y Videos Relacionados */}
           <div className="xl:w-1/3 space-y-6">
-            {/* Mapa de Ubicación */}
             <div className="glass-effect rounded-2xl overflow-hidden border border-gray-700 bg-gray-800/50">
               <div className="p-4 border-b border-gray-700">
                 <h3 className="font-semibold text-cyan-400 text-lg">
-                  {showVideoLocation || selectedLocation ? 'Ubicaciones' : 'Mapa'}
+                  Mapa de Ubicaciones
                 </h3>
+                {selectedCategory && (
+                  <p className="text-sm text-purple-400 mt-1">
+                    Filtrado por: {selectedCategory.name}
+                  </p>
+                )}
               </div>
               <div className="h-80">
                 <Map
@@ -717,7 +806,7 @@ const VideoPlayer = () => {
                 >
                   <NavigationControl position="top-right" />
                   
-                  {/* Marcador de ubicación seleccionada */}
+                  {/* SOLO mostrar ubicacion seleccionada si existe */}
                   {selectedLocation && (
                     <Marker
                       latitude={selectedLocation.latitude}
@@ -735,7 +824,6 @@ const VideoPlayer = () => {
                     </Marker>
                   )}
                   
-                  {/* Marcador de ubicación del video */}
                   {showVideoLocation && videoLocation && (
                     <Marker
                       latitude={videoLocation.latitude}
@@ -753,7 +841,7 @@ const VideoPlayer = () => {
                     </Marker>
                   )}
                   
-                  {/* Marcador de ubicación del usuario */}
+                  {/* SIEMPRE mostrar ubicacion actual si existe */}
                   {userLocation && (
                     <Marker
                       latitude={userLocation.latitude}
@@ -763,7 +851,7 @@ const VideoPlayer = () => {
                         <div className="relative">
                           <div className="h-6 w-6 bg-gradient-to-r from-blue-500 to-cyan-500 border-2 border-white rounded-full"></div>
                           <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
-                            Ubicación
+                            Mi Ubicacion
                           </div>
                         </div>
                       </div>
@@ -773,37 +861,59 @@ const VideoPlayer = () => {
               </div>
               <div className="p-4 border-t border-gray-700">
                 <div className="space-y-2">
+                  {/* SOLO mostrar ubicacion seleccionada si existe */}
                   {selectedLocation && (
                     <div className="flex items-center gap-2">
                       <div className="h-3 w-3 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full animate-pulse"></div>
-                      <span className="text-sm">Ubicación seleccionada: {selectedLocationName}</span>
+                      <span className="text-sm">Ubicacion seleccionada: {selectedLocationName}</span>
                     </div>
                   )}
+                  
                   {showVideoLocation && (
                     <div className="flex items-center gap-2">
                       <div className="h-3 w-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full animate-pulse"></div>
-                      <span className="text-sm">Ubicación del video: {videoLocationName}</span>
+                      <span className="text-sm">Ubicacion del video: {videoLocationName}</span>
                     </div>
                   )}
+                  
+                  {/* SIEMPRE mostrar ubicacion actual si existe */}
                   {userLocation && (
                     <div className="flex items-center gap-2">
                       <div className="h-3 w-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"></div>
-                      <span className="text-sm">Tu ubicación: {userLocationName}</span>
+                      <span className="text-sm">Mi ubicacion: {userLocationName}</span>
                     </div>
                   )}
+                  
                   {!showVideoLocation && !userLocation && !selectedLocation && (
                     <div className="text-center text-gray-400 text-sm">
-                      No se detectó ubicación específica para este video
+                      No se detecto ubicacion especifica para este video
                     </div>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Videos Relacionados */}
             <div className="glass-effect rounded-2xl border border-gray-700 bg-gray-800/50">
               <div className="p-4 border-b border-gray-700">
-                <h3 className="font-semibold text-cyan-400 text-lg">Videos Relacionados</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-cyan-400 text-lg">
+                    {selectedCategory ? `Videos de ${selectedCategory.name}` : 'Videos Relacionados'}
+                  </h3>
+                  {selectedCategory && (
+                    <button
+                      onClick={clearCategorySelection}
+                      className="text-xs bg-red-500 hover:bg-red-600 px-2 py-1 rounded text-white transition-colors"
+                      title="Quitar filtro de categoria"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                {selectedCategory && (
+                  <p className="text-sm text-purple-400 mt-1">
+                    Mostrando contenido de {selectedCategory.name.toLowerCase()}
+                  </p>
+                )}
               </div>
               <div className="max-h-96 overflow-y-auto">
                 {relatedVideos.length > 0 ? (
@@ -811,11 +921,13 @@ const VideoPlayer = () => {
                     <div
                       key={video.youtube_video_id}
                       onClick={() => navigate(`/video/${video.youtube_video_id}`, { 
-                        state: { selectedLocation: selectedLocation ? { 
-                          latitude: selectedLocation.latitude, 
-                          longitude: selectedLocation.longitude, 
-                          name: selectedLocationName 
-                        } : null }
+                        state: { 
+                          selectedLocation: selectedLocation ? { 
+                            latitude: selectedLocation.latitude, 
+                            longitude: selectedLocation.longitude, 
+                            name: selectedLocationName 
+                          } : null
+                        }
                       })}
                       className="p-4 border-b border-gray-700 hover:bg-gray-700/30 cursor-pointer transition-all duration-300 group"
                     >
@@ -829,6 +941,11 @@ const VideoPlayer = () => {
                               e.target.src = 'https://via.placeholder.com/80x56/1f2937/6b7280?text=Video';
                             }}
                           />
+                          {video.searchCategory && video.searchCategory !== 'general' && (
+                            <div className="absolute -top-1 -right-1 bg-purple-500 text-white text-xs px-1 rounded">
+                              {video.searchCategory.charAt(0)}
+                            </div>
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-white text-sm line-clamp-2 group-hover:text-cyan-300 transition-colors">
@@ -846,22 +963,34 @@ const VideoPlayer = () => {
                   ))
                 ) : (
                   <div className="p-6 text-center">
-                    <p className="text-gray-400">No hay videos relacionados disponibles</p>
+                    <p className="text-gray-400">
+                      {selectedCategory 
+                        ? `No hay videos de ${selectedCategory.name} disponibles` 
+                        : 'No hay videos relacionados disponibles'
+                      }
+                    </p>
+                    {selectedCategory && (
+                      <button
+                        onClick={clearCategorySelection}
+                        className="text-cyan-400 text-sm mt-2 hover:text-cyan-300"
+                      >
+                        Quitar filtro
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Información Técnica */}
             <div className="glass-effect rounded-2xl border border-gray-700 bg-gray-800/50 p-4">
-              <h3 className="font-semibold text-cyan-400 text-lg mb-3">Información Técnica</h3>
+              <h3 className="font-semibold text-cyan-400 text-lg mb-3">Informacion Tecnica</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-400">Video ID:</span>
                   <span className="text-white font-mono">{videoId}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Resolución:</span>
+                  <span className="text-gray-400">Resolucion:</span>
                   <span className="text-white">1080p</span>
                 </div>
                 <div className="flex justify-between">

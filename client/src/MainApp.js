@@ -64,10 +64,10 @@ const MainApp = () => {
 
   // Constantes - MOVER A VARIABLES DE ENTORNO EN PRODUCCIÓN
   const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN || 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
-  const YOUTUBE_API_KEY = process.env.REACT_APP_YOUTUBE_API_KEY || 'AIzaSyCi_KpytxXFwg6wCQKTYoCiVffiFRoGlsQ';
+  const YOUTUBE_API_KEY = process.env.REACT_APP_YOUTUBE_API_KEY || 'AIzaSyAMXqOfXkEHPmpu0O5a83k7c_snASAEJ50';
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
-  // 🔒 PAÍSES Y CIUDADES RESTRINGIDAS - LISTA AMPLIADA
+  // PAÍSES Y CIUDADES RESTRINGIDAS - LISTA AMPLIADA
   const restrictedCountries = ['KP', 'IR', 'SY', 'SS', 'CU', 'CN', 'TM', 'UZ', 'TJ', 'ER', 'SD', 'RU', 'BY', 'MM'];
   const restrictedCities = [
     'pyongyang', 'corea del norte', 'north korea', 'korea dpr',
@@ -198,9 +198,9 @@ const MainApp = () => {
     'Estambul, Turquía'
   ];
 
-  // 🔒 FUNCIÓN MEJORADA PARA VERIFICAR RESTRICCIONES
+  // FUNCIÓN MEJORADA PARA VERIFICAR RESTRICCIONES
   const checkRestrictions = useCallback((query, locationData = null) => {
-    console.log('🔍 Verificando restricciones para:', query, locationData);
+    console.log('Verificando restricciones para:', query, locationData);
     
     // Verificar ciudades/países restringidos en el query
     const restrictedPatterns = new RegExp(
@@ -209,11 +209,11 @@ const MainApp = () => {
     );
     
     if (restrictedPatterns.test(query.toLowerCase())) {
-      console.log('🚫 Query restringido detectado:', query);
+      console.log('Query restringido detectado:', query);
       return {
         restricted: true,
         reason: 'query',
-        message: '⚠️ Videos no disponibles en esta región (restricción de YouTube).'
+        message: 'Videos no disponibles en esta región (restricción de YouTube).'
       };
     }
 
@@ -221,11 +221,11 @@ const MainApp = () => {
     if (locationData && locationData.countryCode) {
       const countryCode = locationData.countryCode.toUpperCase();
       if (restrictedCountries.includes(countryCode)) {
-        console.log('🚫 País restringido detectado:', countryCode);
+        console.log('País restringido detectado:', countryCode);
         return {
           restricted: true,
           reason: 'country',
-          message: '⚠️ YouTube no está disponible en este país (restricción gubernamental).'
+          message: 'YouTube no está disponible en este país (restricción gubernamental).'
         };
       }
     }
@@ -233,16 +233,16 @@ const MainApp = () => {
     // Verificar también el nombre de la ubicación
     if (locationData && locationData.locationName) {
       if (restrictedPatterns.test(locationData.locationName.toLowerCase())) {
-        console.log('🚫 Ubicación restringida detectada:', locationData.locationName);
+        console.log('Ubicación restringida detectada:', locationData.locationName);
         return {
           restricted: true,
           reason: 'location',
-          message: '⚠️ Videos no disponibles en esta ubicación (restricción de YouTube).'
+          message: 'Videos no disponibles en esta ubicación (restricción de YouTube).'
         };
       }
     }
 
-    console.log('✅ Ubicación permitida');
+    console.log('Ubicación permitida');
     return { restricted: false };
   }, []);
 
@@ -500,7 +500,7 @@ const MainApp = () => {
     }
   };
 
-  // 🔒 MANEJAR CLIC EN EL MAPA CON VERIFICACIÓN DE RESTRICCIONES
+  //  MANEJAR CLIC EN EL MAPA CON VERIFICACIÓN DE RESTRICCIONES
   const handleMapClick = async (event) => {
     const { lngLat } = event;
     const clickedLat = lngLat.lat;
@@ -523,7 +523,7 @@ const MainApp = () => {
     try {
       const locationCheck = await isValidMapLocation(clickedLat, clickedLng);
       
-      // 🔒 VERIFICAR RESTRICCIONES para el clic en el mapa
+      // VERIFICAR RESTRICCIONES para el clic en el mapa
       if (locationCheck.countryCode && restrictedCountries.includes(locationCheck.countryCode)) {
         setIsValidLocation(false);
         setClickedLocation({ latitude: clickedLat, longitude: clickedLng });
@@ -534,7 +534,7 @@ const MainApp = () => {
       }
       
       if (locationCheck.isValid && locationCheck.placeName) {
-        // 🔒 VERIFICAR RESTRICCIONES por nombre de ubicación
+        // VERIFICAR RESTRICCIONES por nombre de ubicación
         const restrictionCheck = checkRestrictions(locationCheck.placeName, {
           countryCode: locationCheck.countryCode,
           locationName: locationCheck.placeName
@@ -586,7 +586,7 @@ const MainApp = () => {
     }
   };
 
-  // 🔒 BUSCAR VIDEOS POR CATEGORÍA CON VERIFICACIÓN DE RESTRICCIONES
+  // BUSCAR VIDEOS POR CATEGORÍA CON VERIFICACIÓN DE RESTRICCIONES
   const searchVideosByCategory = async (category) => {
     setLoadingVideos(true);
     setSelectedCategory(category);
@@ -611,7 +611,7 @@ const MainApp = () => {
         return;
       }
 
-      // 🔒 VERIFICAR RESTRICCIONES para la ubicación
+      // VERIFICAR RESTRICCIONES para la ubicación
       const locationCheck = await isValidMapLocation(latitude, longitude);
       const restrictionCheck = checkRestrictions(locationName, {
         countryCode: locationCheck.countryCode,
@@ -1053,7 +1053,7 @@ const MainApp = () => {
           const locationName = await getLocationName(latitude, longitude);
           setUserLocationName(locationName);
           
-          // 🔒 VERIFICAR RESTRICCIONES para ubicación del usuario
+          // VERIFICAR RESTRICCIONES para ubicación del usuario
           const locationCheck = await isValidMapLocation(latitude, longitude);
           const restrictionCheck = checkRestrictions(locationName, {
             countryCode: locationCheck.countryCode,
@@ -1104,7 +1104,7 @@ const MainApp = () => {
     try {
       const locationName = userLocationName || await getLocationName(userLocation.latitude, userLocation.longitude);
       
-      // 🔒 VERIFICAR RESTRICCIONES
+      //  VERIFICAR RESTRICCIONES
       const locationCheck = await isValidMapLocation(userLocation.latitude, userLocation.longitude);
       const restrictionCheck = checkRestrictions(locationName, {
         countryCode: locationCheck.countryCode,
@@ -1139,7 +1139,7 @@ const MainApp = () => {
     try {
       const locationName = userLocationName || await getLocationName(userLocation.latitude, userLocation.longitude);
       
-      // 🔒 VERIFICAR RESTRICCIONES
+      // VERIFICAR RESTRICCIONES
       const locationCheck = await isValidMapLocation(userLocation.latitude, userLocation.longitude);
       const restrictionCheck = checkRestrictions(locationName, {
         countryCode: locationCheck.countryCode,
@@ -1171,7 +1171,7 @@ const MainApp = () => {
     }
   }, [userLocation, userLocationName, getLocationName, searchYouTubeVideosByLocation, loadVideosForLocation, checkRestrictions]);
 
-  // 🔒 BÚSQUEDA MEJORADA CON VERIFICACIÓN COMPLETA DE RESTRICCIONES
+  // BÚSQUEDA MEJORADA CON VERIFICACIÓN COMPLETA DE RESTRICCIONES
   const fetchVideos = useCallback(async (query, pageToken = '') => {
     if (!query.trim()) {
       setSearchError('Por favor ingresa un término de búsqueda válido.');
@@ -1191,7 +1191,7 @@ const MainApp = () => {
         longitude = clickedLocation.longitude;
         locationName = clickedLocationName;
         
-        // 🔒 VERIFICAR RESTRICCIONES para ubicación clickeada
+        // VERIFICAR RESTRICCIONES para ubicación clickeada
         const locationCheck = await isValidMapLocation(latitude, longitude);
         const restrictionCheck = checkRestrictions(locationName, {
           countryCode: locationCheck.countryCode,
@@ -1210,7 +1210,7 @@ const MainApp = () => {
         longitude = userLocation.longitude;
         locationName = userLocationName;
         
-        // 🔒 VERIFICAR RESTRICCIONES para ubicación actual
+        // VERIFICAR RESTRICCIONES para ubicación actual
         const locationCheck = await isValidMapLocation(latitude, longitude);
         const restrictionCheck = checkRestrictions(locationName, {
           countryCode: locationCheck.countryCode,
@@ -1231,7 +1231,7 @@ const MainApp = () => {
         locationName = locationData.locationName;
         countryCode = locationData.countryCode;
 
-        // 🔒 VERIFICAR RESTRICCIONES para búsqueda por nombre
+        // VERIFICAR RESTRICCIONES para búsqueda por nombre
         const restrictionCheck = checkRestrictions(query, locationData);
         if (restrictionCheck.restricted) {
           alert(restrictionCheck.message);
@@ -1246,7 +1246,7 @@ const MainApp = () => {
         });
       }
 
-      // 🔒 VERIFICACIÓN FINAL antes de buscar videos
+      // VERIFICACIÓN FINAL antes de buscar videos
       const finalLocationCheck = await isValidMapLocation(latitude, longitude);
       const finalRestrictionCheck = checkRestrictions(query, {
         countryCode: finalLocationCheck.countryCode,
@@ -1785,7 +1785,7 @@ const MainApp = () => {
                 <input
                   ref={searchInputRef}
                   type="text"
-                  placeholder="Buscar términos como 'tacos', 'corridas de toros', etc."
+                  placeholder="Buscar términos..."
                   value={searchTerm}
                   onChange={handleSearchChange}
                   onFocus={handleSearchFocus}
