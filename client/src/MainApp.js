@@ -1353,6 +1353,7 @@ const MainApp = () => {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('selectedLocation'); // Limpiar ubicación seleccionada
     setUser(null);
     setShowProfile(false);
     setShowSettings(false);
@@ -1374,7 +1375,32 @@ const MainApp = () => {
     if (user) {
       registerVideoAccess(video);
     }
-    navigate(`/video/${video.youtube_video_id}`);
+    
+    // Pasar la ubicación seleccionada al VideoPlayer
+    const locationState = {};
+    
+    if (clickedLocation && isValidLocation) {
+      locationState.selectedLocation = {
+        latitude: clickedLocation.latitude,
+        longitude: clickedLocation.longitude,
+        name: clickedLocationName
+      };
+    } else if (searchLocation) {
+      locationState.selectedLocation = {
+        latitude: searchLocation.latitude,
+        longitude: searchLocation.longitude,
+        name: searchLocation.name
+      };
+    }
+    
+    // Guardar también en localStorage como backup
+    if (locationState.selectedLocation) {
+      localStorage.setItem('selectedLocation', JSON.stringify(locationState.selectedLocation));
+    }
+    
+    navigate(`/video/${video.youtube_video_id}`, { 
+      state: locationState 
+    });
   };
 
   const handleMarkerClick = (video) => {
@@ -1388,14 +1414,64 @@ const MainApp = () => {
     if (user) {
       registerVideoAccess(video);
     }
-    navigate(`/video/${video.youtube_video_id}`);
+    
+    // Pasar la ubicación seleccionada al VideoPlayer
+    const locationState = {};
+    
+    if (clickedLocation && isValidLocation) {
+      locationState.selectedLocation = {
+        latitude: clickedLocation.latitude,
+        longitude: clickedLocation.longitude,
+        name: clickedLocationName
+      };
+    } else if (searchLocation) {
+      locationState.selectedLocation = {
+        latitude: searchLocation.latitude,
+        longitude: searchLocation.longitude,
+        name: searchLocation.name
+      };
+    }
+    
+    // Guardar también en localStorage como backup
+    if (locationState.selectedLocation) {
+      localStorage.setItem('selectedLocation', JSON.stringify(locationState.selectedLocation));
+    }
+    
+    navigate(`/video/${video.youtube_video_id}`, { 
+      state: locationState 
+    });
   };
 
   const handleWatchComplete = () => {
     if (user && selectedVideo) {
       registerVideoAccess(selectedVideo);
     }
-    selectedVideo?.youtube_video_id && navigate(`/video/${selectedVideo.youtube_video_id}`);
+    
+    // Pasar la ubicación seleccionada al VideoPlayer
+    const locationState = {};
+    
+    if (clickedLocation && isValidLocation) {
+      locationState.selectedLocation = {
+        latitude: clickedLocation.latitude,
+        longitude: clickedLocation.longitude,
+        name: clickedLocationName
+      };
+    } else if (searchLocation) {
+      locationState.selectedLocation = {
+        latitude: searchLocation.latitude,
+        longitude: searchLocation.longitude,
+        name: searchLocation.name
+      };
+    }
+    
+    // Guardar también en localStorage como backup
+    if (locationState.selectedLocation) {
+      localStorage.setItem('selectedLocation', JSON.stringify(locationState.selectedLocation));
+    }
+    
+    selectedVideo?.youtube_video_id && navigate(`/video/${selectedVideo.youtube_video_id}`, { 
+      state: locationState 
+    });
   };
 
   // Helper functions
@@ -1921,7 +1997,7 @@ const MainApp = () => {
                 anchor="top"
                 className="rounded-xl shadow-2xl border border-gray-300 bg-white/95 backdrop-blur-md"
               >
-                <div className="p-4 w-60 text-center text-gray-800">
+                <div className="p-4 w-65 text-center text-gray-800">
                   <h3 className="font-semibold text-lg mb-2 leading-snug">
                     {isValidLocation ? clickedLocationName : 'Ubicación no disponible'}
                   </h3>
@@ -1996,7 +2072,7 @@ const MainApp = () => {
               >
                 <div
                   onClick={() => handleMarkerClick(video)}
-                  onDoubleClick={() => handleVideoDoubleClick(video)}
+                  onDoubleClick={() => handleMarkerDoubleClick(video)}
                   className="cursor-pointer text-3xl transform hover:scale-150 transition-all duration-300"
                   title="Click para vista previa, Doble click para ver completo"
                 >
