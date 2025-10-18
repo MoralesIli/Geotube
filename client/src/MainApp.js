@@ -288,6 +288,33 @@ const MainApp = () => {
     }
   };
 
+  // NUEVA FUNCIÓN PARA MOVER EL MAPA A UNA UBICACIÓN ESPECÍFICA
+  const moveMapToLocation = async (locationName) => {
+    try {
+      const locationData = await getLocationCoordinates(locationName);
+      
+      if (locationData) {
+        setTargetViewport({
+          latitude: locationData.latitude,
+          longitude: locationData.longitude,
+          zoom: 10
+        });
+        
+        // Actualizar la ubicación clickeada para que esté disponible para búsquedas
+        setClickedLocation({
+          latitude: locationData.latitude,
+          longitude: locationData.longitude
+        });
+        setClickedLocationName(locationData.locationName);
+        setIsValidLocation(true);
+        
+        console.log('Mapa movido a:', locationData.locationName);
+      }
+    } catch (error) {
+      console.error('Error moviendo el mapa a la ubicación:', error);
+    }
+  };
+
   // Función para detectar región del usuario
   const detectUserRegion = async () => {
     try {
@@ -1399,6 +1426,18 @@ const MainApp = () => {
     }
   };
 
+  // MODIFICADA: Función para manejar clic en sugerencias - Ahora mueve el mapa también
+  const handleSuggestionClick = async (suggestion) => {
+    setSearchTerm(suggestion);
+    setShowSuggestions(false);
+    
+    // Mover el mapa a la ubicación seleccionada
+    await moveMapToLocation(suggestion);
+    
+    // Buscar videos para esa ubicación
+    fetchVideos(suggestion);
+  };
+
   // Handlers para el buscador con sugerencias
   const handleSearchChange = (e) => {
     const value = e.target.value;
@@ -1422,12 +1461,6 @@ const MainApp = () => {
     } else {
       setSearchError('Por favor ingresa un término de búsqueda válido.');
     }
-  };
-
-  const handleSuggestionClick = (suggestion) => {
-    setSearchTerm(suggestion);
-    setShowSuggestions(false);
-    fetchVideos(suggestion);
   };
 
   const handleSearchFocus = () => {
