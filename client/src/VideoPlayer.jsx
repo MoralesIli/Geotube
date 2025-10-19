@@ -41,8 +41,8 @@ const VideoPlayer = () => {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [currentSearchType, setCurrentSearchType] = useState('related'); // 'related', 'category', 'search'
 
-  const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN || 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
-  const YOUTUBE_API_KEY = process.env.REACT_APP_YOUTUBE_API_KEY || 'AIzaSyAmkc92taptBHHwQsQdOJiGW7Wktghl-OI';
+  const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
+  const YOUTUBE_API_KEY = process.env.REACT_APP_YOUTUBE_API_KEY;
 
   const categories = [
     {

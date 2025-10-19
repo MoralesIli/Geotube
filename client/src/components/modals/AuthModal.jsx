@@ -69,25 +69,6 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
     }
   };
 
-  useEffect(() => {
-    if (isOpen) {
-      setIsLogin(true);
-
-      // limpiar
-      setFormData({ nombre: '', email: '', password: '', confirmPassword: '' });
-      setError('');
-      setErrorMail('');
-      setErrorRepeat('');
-      setPasswordValidations({ length: false, uppercase: false, number: false, special: false });
-      setShowPassword(false);
-      setShowConfirmPassword(false);
-
-      if (!googleLoaded) {
-        loadGoogleScript();
-      }
-    }
-  }, [isOpen, googleLoaded]);
-
   const loadGoogleScript = () => {
     if (window.google) {
       setGoogleLoaded(true);
@@ -99,18 +80,16 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
     script.async = true;
     script.defer = true;
     script.onload = () => {
-      console.log(' Google Auth script cargado correctamente');
+      console.log('✅ Google Auth script cargado correctamente');
       setGoogleLoaded(true);
     };
     script.onerror = () => {
-      console.error(' Error cargando Google Auth script');
+      console.error('❌ Error cargando Google Auth script');
       setError('Error al cargar Google Auth');
       setGoogleLoaded(false);
     };
     document.body.appendChild(script);
   };
-
-  if (!isOpen) return null;
 
   const handleGoogleAuth = () => {
     if (!window.google || !googleLoaded) {
@@ -119,45 +98,54 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
     }
 
     try {
-      console.log(' Inicializando Google Auth...');
+      console.log('🔄 Iniciando autenticación Google con popup...');
       
       window.google.accounts.id.initialize({
-        client_id: '369281279205-i1b62ojhbhq6jel1oh8li22o1aklklqj.apps.googleusercontent.com',
+        client_id: '369281279205-mj2fc1oeoe56884ubitisfh51bm09us8.apps.googleusercontent.com',
         callback: handleGoogleResponse,
-        context: 'signin',
-        ux_mode: 'popup',
-        auto_prompt: false
+        ux_mode: 'popup', // 🔥 popup forzado
+        auto_select: false,
+        cancel_on_tap_outside: true,
       });
 
-      // Lanzar el popup de Google directamente
-      window.google.accounts.id.prompt((notification) => {
-        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-          console.log(' Mostrando botón manual de Google');
-          window.google.accounts.id.renderButton(
-            document.getElementById('googleButton'),
-            { 
-              theme: 'outline', 
-              size: 'large',
-              text: 'continue_with',
-              shape: 'rectangular',
-              logo_alignment: 'left'
-            }
-          );
-        }
-      });
-
+      // Mostrar siempre el popup directamente
+      window.google.accounts.id.prompt();
     } catch (error) {
-      console.error(' Error initializing Google Auth:', error);
+      console.error('❌ Error initializing Google Auth:', error);
       setError('Error al inicializar Google Auth');
     }
   };
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsLogin(true);
+
+      // Limpiar estado
+      setFormData({ nombre: '', email: '', password: '', confirmPassword: '' });
+      setError('');
+      setErrorMail('');
+      setErrorRepeat('');
+      setPasswordValidations({ length: false, uppercase: false, number: false, special: false });
+      setShowPassword(false);
+      setShowConfirmPassword(false);
+
+      // Cargar Google Script si no está cargado
+      if (!window.google) {
+        console.log('📥 Cargando script de Google...');
+        loadGoogleScript();
+      } else {
+        setGoogleLoaded(true);
+      }
+    }
+  }, [isOpen]);
 
   const handleGoogleResponse = async (response) => {
     try {
       setLoading(true);
       setError('');
 
-      console.log(' Google response received:', response);
+      console.log('✅ Google response received, token length:', response.credential.length);
+      console.log('📤 Enviando token al backend...');
 
       const backendResponse = await fetch('http://localhost:3001/api/auth/google', {
         method: 'POST',
@@ -167,37 +155,36 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
         body: JSON.stringify({ token: response.credential }),
       });
 
-      // Verificar si la respuesta es JSON
-      const contentType = backendResponse.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const textResponse = await backendResponse.text();
-        console.error(' El servidor devolvió HTML:', textResponse.substring(0, 200));
-        throw new Error('Error del servidor: la ruta /api/auth/google no existe');
+      console.log('📥 Respuesta del backend recibida, status:', backendResponse.status);
+
+      if (!backendResponse.ok) {
+        // Si no es OK, intentar parsear como JSON primero
+        const errorText = await backendResponse.text();
+        try {
+          const errorData = JSON.parse(errorText);
+          throw new Error(errorData.error || 'Error del servidor');
+        } catch {
+          throw new Error(`Error ${backendResponse.status}: ${errorText}`);
+        }
       }
 
       const data = await backendResponse.json();
 
-      if (!backendResponse.ok) {
-        throw new Error(data.error || 'Error del servidor');
-      }
-
-      console.log(' Login exitoso con Google:', data.user);
+      console.log('🎉 Login exitoso con Google:', data.user);
       
-      // Guardar datos en localStorage
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       
-      // Llamar onLogin con los datos del usuario
       onLogin(data.user);
       onClose();
 
     } catch (err) {
-      console.error(' Google auth error:', err);
+      console.error('❌ Google auth error:', err);
       
       if (err.message.includes('Failed to fetch')) {
         setError('No se pudo conectar al servidor. Verifica que esté corriendo en localhost:3001');
-      } else if (err.message.includes('HTML')) {
-        setError('Error del servidor: la ruta /api/auth/google no existe o hay un error');
+      } else if (err.message.includes('404') || err.message.includes('Cannot POST')) {
+        setError('Error: La ruta /api/auth/google no existe en el servidor. Verifica el backend.');
       } else {
         setError(err.message || 'Error en autenticación con Google');
       }
@@ -246,7 +233,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
         ? { email: formData.email, password: formData.password }
         : { nombre: formData.nombre, email: formData.email, password: formData.password };
 
-      console.log(' Enviando datos a:', endpoint, payload);
+      console.log('📤 Enviando datos a:', endpoint, payload);
 
       const response = await fetch(`http://localhost:3001/api/auth${endpoint}`, {
         method: 'POST',
@@ -256,27 +243,23 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
         body: JSON.stringify(payload),
       });
 
-      // Verificar si la respuesta es JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const textResponse = await response.text();
-        console.error(' El servidor devolvió HTML:', textResponse.substring(0, 200));
-        throw new Error('Error del servidor: verifica que las rutas de auth existan');
+      if (!response.ok) {
+        const errorText = await response.text();
+        try {
+          const errorData = JSON.parse(errorText);
+          throw new Error(errorData.error);
+        } catch {
+          throw new Error(`Error ${response.status}: ${errorText}`);
+        }
       }
 
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error);
-      }
-
-      console.log(' Login/Register exitoso:', data.user);
+      console.log('🎉 Login/Register exitoso:', data.user);
       
-      // Guardar datos en localStorage
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       
-      // Llamar onLogin con los datos del usuario
       onLogin(data.user);
       onClose();
 
@@ -288,7 +271,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       setShowConfirmPassword(false);
 
     } catch (err) {
-      console.error(' Error en auth:', err);
+      console.error('❌ Error en auth:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -305,6 +288,8 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       confirmPassword: ''
     });
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="modal-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -328,23 +313,22 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
           </div>
         )}
 
-        {/* Botón de Google */}
+        {/* Botón de Google - Ahora es un botón personalizado */}
         <div className="mb-6">
-          <div id="googleButton" className="flex justify-center">
-            <button
-              onClick={handleGoogleAuth}
-              disabled={loading || !googleLoaded}
-              className="w-full bg-white text-gray-800 hover:bg-gray-100 font-semibold py-3 px-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-3 border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-              </svg>
-              {loading ? 'Cargando...' : 'Continuar con Google'}
-            </button>
-          </div>
+          <button
+            onClick={handleGoogleAuth}
+            disabled={loading || !googleLoaded}
+            className="w-full bg-white text-gray-800 hover:bg-gray-100 font-semibold py-3 px-4 rounded-lg transition-all duration-300 flex items-center justify-center gap-3 border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+            </svg>
+            {loading ? 'Cargando...' : 'Continuar con Google'}
+          </button>
+          
           {!googleLoaded && (
             <p className="text-xs text-yellow-500 mt-2 text-center">
               Cargando Google Auth...
@@ -414,24 +398,22 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
               {showPassword ? <FaEyeSlash size={20} /> : <FaEye size={20} />}
             </button>
 
-            {/* Indicadores de validación */
-              !isLogin && (
-                <ul className="mt-2 text-sm space-y-1">
-                  <li className={passwordValidations.length ? "text-green-400" : "text-red-400"}>
-                    {passwordValidations.length ? "✔" : "✖"} Al menos 8 caracteres
-                  </li>
-                  <li className={passwordValidations.uppercase ? "text-green-400" : "text-red-400"}>
-                    {passwordValidations.uppercase ? "✔" : "✖"} Una letra mayúscula
-                  </li>
-                  <li className={passwordValidations.number ? "text-green-400" : "text-red-400"}>
-                    {passwordValidations.number ? "✔" : "✖"} Un número
-                  </li>
-                  <li className={passwordValidations.special ? "text-green-400" : "text-red-400"}>
-                    {passwordValidations.special ? "✔" : "✖"} Un carácter especial
-                  </li>
-                </ul>
-              )
-            }
+            {!isLogin && (
+              <ul className="mt-2 text-sm space-y-1">
+                <li className={passwordValidations.length ? "text-green-400" : "text-red-400"}>
+                  {passwordValidations.length ? "✔" : "✖"} Al menos 8 caracteres
+                </li>
+                <li className={passwordValidations.uppercase ? "text-green-400" : "text-red-400"}>
+                  {passwordValidations.uppercase ? "✔" : "✖"} Una letra mayúscula
+                </li>
+                <li className={passwordValidations.number ? "text-green-400" : "text-red-400"}>
+                  {passwordValidations.number ? "✔" : "✖"} Un número
+                </li>
+                <li className={passwordValidations.special ? "text-green-400" : "text-red-400"}>
+                  {passwordValidations.special ? "✔" : "✖"} Un carácter especial
+                </li>
+              </ul>
+            )}
           </div>
 
           {!isLogin && (
