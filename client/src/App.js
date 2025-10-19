@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import MainApp from './MainApp';
 import VideoPlayer from './VideoPlayer';
-import './App.css';
+import './styles/App.css';
 
 function App() {
   return (

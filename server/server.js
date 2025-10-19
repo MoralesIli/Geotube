@@ -1,3 +1,5 @@
+require('dotenv').config(); // ← AGREGAR ESTO AL INICIO
+
 const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
@@ -7,14 +9,21 @@ const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 
 const app = express();
-const port = 3001;
+const port = process.env.PORT || 3001;
+
+// Verificar variables críticas al inicio
+console.log('🔍 Verificando variables de entorno:');
+console.log('JWT_SECRET:', process.env.JWT_SECRET ? '✅ Definido' : '❌ No definido');
+console.log('GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? '✅ Definido' : '❌ No definido');
+console.log('YOUTUBE_API_KEY:', process.env.YOUTUBE_API_KEY ? '✅ Definido' : '❌ No definido');
+console.log('MAPBOX_TOKEN:', process.env.MAPBOX_TOKEN ? '✅ Definido' : '❌ No definido');
 
 // Configuración de la conexión a MySQL
 const db = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: '12345',
-  database: 'geotube_db',
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '12345',
+  database: process.env.DB_NAME || 'geotube_db',
 });
 
 // Conectar a la base de datos
@@ -33,11 +42,22 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 
-// API Keys
-const YOUTUBE_API_KEY = 'AIzaSyAMXqOfXkEHPmpu0O5a83k7c_snASAEJ50';
-const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1IjoieWV1ZGllbCIsImEiOiJjbWM5eG84bDIwbWFoMmtwd3NtMjJ1bzM2In0.j3hc_w65OfZKXbC2YUB64Q';
-const JWT_SECRET = '..';
-const GOOGLE_CLIENT_ID = '369281279205-i1b62ojhbhq6jel1oh8li22o1aklklqj.apps.googleusercontent.com';
+// API Keys - CORREGIDO: usar variables sin REACT_APP_
+const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
+const MAPBOX_TOKEN = process.env.MAPBOX_TOKEN;
+const JWT_SECRET = process.env.JWT_SECRET;
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+
+// Verificar que las variables críticas estén definidas
+if (!JWT_SECRET) {
+  console.error('❌ ERROR: JWT_SECRET no está definido en las variables de entorno');
+  process.exit(1);
+}
+
+if (!GOOGLE_CLIENT_ID) {
+  console.error('❌ ERROR: GOOGLE_CLIENT_ID no está definido en las variables de entorno');
+  process.exit(1);
+}
 
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
@@ -70,7 +90,16 @@ const handleServerError = (res, error, context) => {
 // ==================== RUTAS DE SALUD ====================
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Servidor funcionando correctamente' });
+  res.json({ 
+    status: 'OK', 
+    message: 'Servidor funcionando correctamente',
+    environment: {
+      jwt_configured: !!JWT_SECRET,
+      google_configured: !!GOOGLE_CLIENT_ID,
+      youtube_configured: !!YOUTUBE_API_KEY,
+      mapbox_configured: !!MAPBOX_TOKEN
+    }
+  });
 });
 
 // ==================== RUTAS DE AUTENTICACIÓN ====================
@@ -172,6 +201,8 @@ app.post('/api/auth/google', async (req, res) => {
       return res.status(400).json({ error: 'Token de Google es requerido' });
     }
 
+    console.log('🔐 Verificando token de Google...');
+    
     const ticket = await googleClient.verifyIdToken({
       idToken: token,
       audience: GOOGLE_CLIENT_ID,
@@ -179,6 +210,8 @@ app.post('/api/auth/google', async (req, res) => {
 
     const payload = ticket.getPayload();
     const { sub: googleId, email, name, picture } = payload;
+
+    console.log('✅ Token verificado, usuario:', email);
 
     const [existingUsers] = await executeQuery(
       'SELECT * FROM usuarios WHERE email = ? OR google_id = ?',
@@ -189,6 +222,7 @@ app.post('/api/auth/google', async (req, res) => {
 
     if (existingUsers.length > 0) {
       user = existingUsers[0];
+      console.log('🔄 Usuario existente encontrado:', user.id);
       
       if (!user.google_id || !user.foto) {
         await executeQuery(
@@ -197,8 +231,10 @@ app.post('/api/auth/google', async (req, res) => {
         );
         user.google_id = googleId;
         user.foto = picture;
+        console.log('✅ Usuario actualizado con datos de Google');
       }
     } else {
+      console.log('👤 Creando nuevo usuario con Google...');
       const [result] = await executeQuery(
         'INSERT INTO usuarios (nombre, email, google_id, foto, password) VALUES (?, ?, ?, ?, ?)',
         [name, email, googleId, picture, '']
@@ -211,6 +247,7 @@ app.post('/api/auth/google', async (req, res) => {
         google_id: googleId,
         foto: picture
       };
+      console.log('✅ Nuevo usuario creado:', user.id);
     }
 
     const jwtToken = generateToken({ 
@@ -218,6 +255,8 @@ app.post('/api/auth/google', async (req, res) => {
       email: user.email,
       googleId: googleId 
     });
+
+    console.log('🎉 Autenticación exitosa, generando JWT...');
 
     res.json({
       message: 'Autenticacion con Google exitosa',
@@ -232,7 +271,7 @@ app.post('/api/auth/google', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error en autenticacion con Google:', error);
+    console.error('❌ Error en autenticacion con Google:', error);
     res.status(500).json({ error: 'Error en autenticacion con Google: ' + error.message });
   }
 });
@@ -244,10 +283,77 @@ app.get('/api/auth/verify', authenticateToken, (req, res) => {
   });
 });
 
+// ==================== RUTA PARA CAMBIAR CONTRASEÑA ====================
+
+app.post('/api/auth/change-password', authenticateToken, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user.id;
+
+    // Validar campos requeridos
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'La contraseña actual y la nueva contraseña son requeridas' });
+    }
+
+    // Validar longitud de nueva contraseña
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
+    }
+
+    // Obtener usuario actual
+    const [users] = await executeQuery(
+      'SELECT id, password FROM usuarios WHERE id = ?',
+      [userId]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    const user = users[0];
+
+    // Verificar si el usuario tiene contraseña (no es usuario de Google sin contraseña)
+    if (!user.password) {
+      return res.status(400).json({ error: 'Los usuarios registrados con Google no pueden cambiar contraseña' });
+    }
+
+    // Verificar contraseña actual
+    const validPassword = await bcrypt.compare(currentPassword, user.password);
+    if (!validPassword) {
+      return res.status(400).json({ error: 'La contraseña actual es incorrecta' });
+    }
+
+    // Hashear nueva contraseña
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    // Actualizar contraseña en la base de datos
+    const [result] = await executeQuery(
+      'UPDATE usuarios SET password = ? WHERE id = ?',
+      [hashedNewPassword, userId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(500).json({ error: 'Error al actualizar la contraseña' });
+    }
+
+    console.log(`✅ Contraseña actualizada para usuario ${userId}`);
+
+    res.json({
+      message: 'Contraseña actualizada exitosamente'
+    });
+
+  } catch (error) {
+    console.error('❌ Error cambiando contraseña:', error);
+    res.status(500).json({ error: 'Error interno del servidor al cambiar la contraseña' });
+  }
+});
+
+// ==================== RUTAS DE PERFIL ====================
+
 app.get('/api/auth/profile', authenticateToken, async (req, res) => {
   try {
     const [users] = await executeQuery(
-      'SELECT id, nombre, email, foto, creado_en FROM usuarios WHERE id = ?',
+      'SELECT id, nombre, email, foto, google_id, creado_en FROM usuarios WHERE id = ?',
       [req.user.id]
     );
 
@@ -255,6 +361,9 @@ app.get('/api/auth/profile', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
+    const user = users[0];
+
+    // Obtener estadísticas del usuario
     const [stats] = await executeQuery(
       `SELECT COUNT(*) as total_videos, 
               COUNT(DISTINCT video_id) as videos_unicos,
@@ -265,12 +374,119 @@ app.get('/api/auth/profile', authenticateToken, async (req, res) => {
     );
 
     res.json({
-      user: users[0],
+      user: {
+        id: user.id,
+        nombre: user.nombre,
+        email: user.email,
+        foto: user.foto,
+        google_id: user.google_id,
+        creado_en: user.creado_en
+      },
       statistics: stats[0]
     });
 
   } catch (error) {
     handleServerError(res, error, 'obteniendo perfil');
+  }
+});
+
+app.put('/api/auth/profile', authenticateToken, async (req, res) => {
+  try {
+    const { nombre, email, foto } = req.body;
+    const userId = req.user.id;
+
+    // Validar que al menos un campo sea proporcionado
+    if (!nombre && !email && !foto) {
+      return res.status(400).json({ error: 'Al menos un campo debe ser proporcionado para actualizar' });
+    }
+
+    // Construir la consulta dinámicamente
+    let updateFields = [];
+    let updateValues = [];
+
+    if (nombre) {
+      updateFields.push('nombre = ?');
+      updateValues.push(nombre);
+    }
+
+    if (email) {
+      // Verificar si el email ya existe para otro usuario
+      const [existingEmail] = await executeQuery(
+        'SELECT id FROM usuarios WHERE email = ? AND id != ?',
+        [email, userId]
+      );
+
+      if (existingEmail.length > 0) {
+        return res.status(400).json({ error: 'El email ya está en uso por otro usuario' });
+      }
+
+      updateFields.push('email = ?');
+      updateValues.push(email);
+    }
+
+    if (foto) {
+      updateFields.push('foto = ?');
+      updateValues.push(foto);
+    }
+
+    updateValues.push(userId);
+
+    const query = `UPDATE usuarios SET ${updateFields.join(', ')} WHERE id = ?`;
+    
+    const [result] = await executeQuery(query, updateValues);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    // Obtener el usuario actualizado
+    const [users] = await executeQuery(
+      'SELECT id, nombre, email, foto, creado_en FROM usuarios WHERE id = ?',
+      [userId]
+    );
+
+    res.json({
+      message: 'Perfil actualizado exitosamente',
+      user: users[0]
+    });
+
+  } catch (error) {
+    handleServerError(res, error, 'actualizando perfil');
+  }
+});
+
+// Ruta específica para actualizar solo la foto de perfil
+app.put('/api/auth/profile/photo', authenticateToken, async (req, res) => {
+  try {
+    const { foto } = req.body;
+    const userId = req.user.id;
+
+    if (!foto) {
+      return res.status(400).json({ error: 'La foto es requerida' });
+    }
+
+    const [result] = await executeQuery(
+      'UPDATE usuarios SET foto = ? WHERE id = ?',
+      [foto, userId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    // Obtener el usuario actualizado
+    const [users] = await executeQuery(
+      'SELECT id, nombre, email, foto, creado_en FROM usuarios WHERE id = ?',
+      [userId]
+    );
+
+    res.json({
+      message: 'Foto de perfil actualizada exitosamente',
+      user: users[0]
+    });
+
+  } catch (error) {
+    handleServerError(res, error, 'actualizando foto de perfil');
   }
 });
 
@@ -410,7 +626,7 @@ const geocodeLocation = async (query) => {
   try {
     const response = await axios.get(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json`, {
       params: {
-        access_token: MAPBOX_ACCESS_TOKEN,
+        access_token: MAPBOX_TOKEN, // CORREGIDO: usar MAPBOX_TOKEN
         country: 'mx',
         language: 'es',
       },
@@ -588,4 +804,10 @@ app.use((error, req, res, next) => {
 app.listen(port, () => {
   console.log(`Servidor corriendo en http://localhost:${port}`);
   console.log(`API disponible en http://localhost:${port}/api`);
+  console.log(`✅ Ruta Google Auth: POST http://localhost:${port}/api/auth/google`);
+  console.log(`✅ Ruta Perfil: GET/PUT http://localhost:${port}/api/auth/profile`);
+  console.log(`✅ Ruta Foto Perfil: PUT http://localhost:${port}/api/auth/profile/photo`);
+  console.log(`✅ Ruta Cambiar Contraseña: POST http://localhost:${port}/api/auth/change-password`);
+  console.log(`🔑 JWT Configurado: ${JWT_SECRET ? '✅' : '❌'}`);
+  console.log(`🔑 Google Client ID Configurado: ${GOOGLE_CLIENT_ID ? '✅' : '❌'}`);
 });
