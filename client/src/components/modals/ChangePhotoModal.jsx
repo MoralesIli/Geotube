@@ -46,78 +46,73 @@ const ChangePhotoModal = ({ isOpen, onClose, user, onPhotoUpdate }) => {
 
     try {
       // Convertir imagen a base64
-      const reader = new FileReader();
-      reader.readAsDataURL(selectedFile);
+      const base64Image = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(selectedFile);
+      });
       
-      reader.onload = async () => {
+      const token = localStorage.getItem('token');
+      
+      console.log('📤 Subiendo foto de perfil...');
+      
+      const response = await fetch('http://localhost:3001/api/auth/profile/photo', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ foto: base64Image })
+      });
+
+      console.log('📥 Respuesta del servidor:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
         try {
-          const base64Image = reader.result;
-          
-          const token = localStorage.getItem('token');
-          
-          console.log(' Subiendo foto de perfil...');
-          
-          const response = await fetch('http://localhost:3001/api/auth/profile-photo', {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ foto: base64Image })
-          });
-
-          // Verificar si la respuesta es JSON
-          const contentType = response.headers.get('content-type');
-          if (!contentType || !contentType.includes('application/json')) {
-            const textResponse = await response.text();
-            console.error(' El servidor devolvió HTML:', textResponse.substring(0, 200));
-            throw new Error('Error del servidor: respuesta no válida');
-          }
-
-          const data = await response.json();
-
-          if (!response.ok) {
-            throw new Error(data.error || 'Error al actualizar la foto');
-          }
-
-          console.log(' Foto actualizada:', data.user);
-
-          // Actualizar localStorage y estado
-          const currentUser = JSON.parse(localStorage.getItem('user'));
-          const updatedUser = { 
-            ...currentUser, 
-            foto: data.user.foto 
-          };
-          localStorage.setItem('user', JSON.stringify(updatedUser));
-
-          // Llamar callback para actualizar estado en MainApp
-          if (onPhotoUpdate) {
-            onPhotoUpdate(updatedUser);
-          }
-
-          // Cerrar modal
-          onClose();
-
-          // Limpiar estado
-          setSelectedFile(null);
-          setPreviewUrl('');
-
-        } catch (err) {
-          console.error(' Error en upload:', err);
-          setError(err.message);
-        } finally {
-          setLoading(false);
+          const errorData = JSON.parse(errorText);
+          throw new Error(errorData.error || `Error ${response.status}: ${errorText}`);
+        } catch {
+          throw new Error(`Error ${response.status}: ${errorText}`);
         }
-      };
+      }
 
-      reader.onerror = () => {
-        setError('Error al procesar la imagen');
-        setLoading(false);
+      const data = await response.json();
+
+      console.log('✅ Foto actualizada:', data.user);
+
+      // Actualizar localStorage y estado
+      const currentUser = JSON.parse(localStorage.getItem('user'));
+      const updatedUser = { 
+        ...currentUser, 
+        foto: data.user.foto 
       };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+
+      // Llamar callback para actualizar estado en MainApp
+      if (onPhotoUpdate) {
+        onPhotoUpdate(updatedUser);
+      }
+
+      // Cerrar modal
+      onClose();
+
+      // Limpiar estado
+      setSelectedFile(null);
+      setPreviewUrl('');
 
     } catch (err) {
-      console.error(' Error general:', err);
-      setError('Error al subir la imagen');
+      console.error('❌ Error en upload:', err);
+      
+      if (err.message.includes('Failed to fetch')) {
+        setError('No se pudo conectar al servidor. Verifica que esté corriendo.');
+      } else if (err.message.includes('404')) {
+        setError('Error: La ruta no existe en el servidor. Verifica la URL.');
+      } else {
+        setError(err.message || 'Error al subir la imagen');
+      }
+    } finally {
       setLoading(false);
     }
   };
@@ -133,9 +128,9 @@ const ChangePhotoModal = ({ isOpen, onClose, user, onPhotoUpdate }) => {
     try {
       const token = localStorage.getItem('token');
       
-      console.log(' Eliminando foto de perfil...');
+      console.log('🗑️ Eliminando foto de perfil...');
       
-      const response = await fetch('http://localhost:3001/api/auth/profile-photo', {
+      const response = await fetch('http://localhost:3001/api/auth/profile/photo', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -144,21 +139,22 @@ const ChangePhotoModal = ({ isOpen, onClose, user, onPhotoUpdate }) => {
         body: JSON.stringify({ foto: null })
       });
 
-      // Verificar si la respuesta es JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const textResponse = await response.text();
-        console.error(' El servidor devolvió HTML:', textResponse.substring(0, 200));
-        throw new Error('Error del servidor: respuesta no válida');
-      }
-
-      const data = await response.json();
+      console.log('📥 Respuesta del servidor:', response.status);
 
       if (!response.ok) {
-        throw new Error(data.error || 'Error al eliminar la foto');
+        const errorText = await response.text();
+        try {
+          const errorData = JSON.parse(errorText);
+          throw new Error(errorData.error || `Error ${response.status}: ${errorText}`);
+        } catch {
+          throw new Error(`Error ${response.status}: ${errorText}`);
+        }
       }
 
-      console.log(' Foto eliminada correctamente');
+      // ✅ CORREGIDO: Removí la variable 'data' que no se usaba
+      await response.json();
+
+      console.log('✅ Foto eliminada correctamente');
 
       // Actualizar localStorage y estado
       const currentUser = JSON.parse(localStorage.getItem('user'));
@@ -177,11 +173,26 @@ const ChangePhotoModal = ({ isOpen, onClose, user, onPhotoUpdate }) => {
       onClose();
 
     } catch (err) {
-      console.error(' Error eliminando foto:', err);
-      setError(err.message);
+      console.error('❌ Error eliminando foto:', err);
+      
+      if (err.message.includes('Failed to fetch')) {
+        setError('No se pudo conectar al servidor. Verifica que esté corriendo.');
+      } else if (err.message.includes('404')) {
+        setError('Error: La ruta no existe en el servidor. Verifica la URL.');
+      } else {
+        setError(err.message || 'Error al eliminar la foto');
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCancel = () => {
+    // Limpiar estado al cancelar
+    setSelectedFile(null);
+    setPreviewUrl('');
+    setError('');
+    onClose();
   };
 
   return (
@@ -192,7 +203,7 @@ const ChangePhotoModal = ({ isOpen, onClose, user, onPhotoUpdate }) => {
             Cambiar Foto de Perfil
           </h2>
           <button
-            onClick={onClose}
+            onClick={handleCancel}
             className="text-gray-400 hover:text-white text-2xl transition-colors"
             disabled={loading}
           >
@@ -243,16 +254,26 @@ const ChangePhotoModal = ({ isOpen, onClose, user, onPhotoUpdate }) => {
           <label className="block text-sm font-medium mb-3 text-gray-300">
             Seleccionar nueva imagen
           </label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleFileSelect}
-            className="w-full text-white text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cyan-500 file:text-white hover:file:bg-cyan-600 transition-colors"
-            disabled={loading}
-          />
-          <p className="text-xs text-gray-400 mt-2">
-            Formatos soportados: JPG, PNG, GIF. Tamaño máximo: 5MB
-          </p>
+          <div className="flex items-center justify-center w-full">
+            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-600 border-dashed rounded-lg cursor-pointer bg-gray-700 hover:bg-gray-600 transition-colors">
+              <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                <svg className="w-8 h-8 mb-4 text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                  <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                </svg>
+                <p className="mb-2 text-sm text-gray-400">
+                  <span className="font-semibold">Haz clic para subir</span> o arrastra y suelta
+                </p>
+                <p className="text-xs text-gray-400">PNG, JPG, GIF (MAX. 5MB)</p>
+              </div>
+              <input 
+                type="file" 
+                className="hidden" 
+                accept="image/*"
+                onChange={handleFileSelect}
+                disabled={loading}
+              />
+            </label>
+          </div>
         </div>
 
         {/* Botones de acción */}
@@ -278,7 +299,7 @@ const ChangePhotoModal = ({ isOpen, onClose, user, onPhotoUpdate }) => {
 
         <div className="mt-4 text-center">
           <button
-            onClick={onClose}
+            onClick={handleCancel}
             className="text-gray-400 hover:text-white text-sm transition-colors"
             disabled={loading}
           >
