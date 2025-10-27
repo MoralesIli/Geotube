@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import YouTube from 'react-youtube';
-import Map, { Marker, NavigationControl, Popup } from 'react-map-gl/mapbox';
+import Map, { Marker, NavigationControl } from 'react-map-gl/mapbox'; // Removido Popup
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 const VideoPlayer = () => {
