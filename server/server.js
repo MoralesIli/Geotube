@@ -1,4 +1,4 @@
-require('dotenv').config(); // ← AGREGAR ESTO AL INICIO
+require('dotenv').config();
 
 const express = require('express');
 const mysql = require('mysql2');
@@ -12,11 +12,11 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 // Verificar variables críticas al inicio
-console.log('🔍 Verificando variables de entorno:');
-console.log('JWT_SECRET:', process.env.JWT_SECRET ? '✅ Definido' : '❌ No definido');
-console.log('GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? '✅ Definido' : '❌ No definido');
-console.log('YOUTUBE_API_KEY:', process.env.YOUTUBE_API_KEY ? '✅ Definido' : '❌ No definido');
-console.log('MAPBOX_TOKEN:', process.env.MAPBOX_TOKEN ? '✅ Definido' : '❌ No definido');
+console.log('Verificando variables de entorno:');
+console.log('JWT_SECRET:', process.env.JWT_SECRET ? 'Definido' : 'No definido');
+console.log('GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? 'Definido' : 'No definido');
+console.log('YOUTUBE_API_KEY:', process.env.YOUTUBE_API_KEY ? 'Definido' : 'No definido');
+console.log('MAPBOX_TOKEN:', process.env.MAPBOX_TOKEN ? 'Definido' : 'No definido');
 
 // Configuración de la conexión a MySQL
 const db = mysql.createConnection({
@@ -42,7 +42,7 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 
-// API Keys - CORREGIDO: usar variables sin REACT_APP_
+// API Keys
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 const MAPBOX_TOKEN = process.env.MAPBOX_TOKEN;
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -50,12 +50,12 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 
 // Verificar que las variables críticas estén definidas
 if (!JWT_SECRET) {
-  console.error('❌ ERROR: JWT_SECRET no está definido en las variables de entorno');
+  console.error('ERROR: JWT_SECRET no está definido en las variables de entorno');
   process.exit(1);
 }
 
 if (!GOOGLE_CLIENT_ID) {
-  console.error('❌ ERROR: GOOGLE_CLIENT_ID no está definido en las variables de entorno');
+  console.error('ERROR: GOOGLE_CLIENT_ID no está definido en las variables de entorno');
   process.exit(1);
 }
 
@@ -100,6 +100,177 @@ app.get('/api/health', (req, res) => {
       mapbox_configured: !!MAPBOX_TOKEN
     }
   });
+});
+
+// ==================== RUTAS DE COMENTARIOS DEL PROYECTO ====================
+
+// Obtener todos los comentarios del proyecto (público)
+app.get('/api/comentarios-proyecto', async (req, res) => {
+  try {
+    const [comentarios] = await executeQuery(`
+      SELECT 
+        cp.id,
+        cp.comentario,
+        cp.calificacion,
+        cp.creado_en,
+        cp.usuario_id,
+        u.nombre as usuario_nombre,
+        u.foto as usuario_foto
+      FROM comentarios_proyecto cp
+      LEFT JOIN usuarios u ON cp.usuario_id = u.id
+      ORDER BY cp.creado_en DESC
+    `);
+
+    res.json(comentarios);
+  } catch (error) {
+    handleServerError(res, error, 'obteniendo comentarios del proyecto');
+  }
+});
+
+// Crear nuevo comentario del proyecto (requiere autenticación)
+app.post('/api/comentarios-proyecto', authenticateToken, async (req, res) => {
+  try {
+    const { comentario, calificacion } = req.body;
+    const usuario_id = req.user.id;
+
+    // Validaciones
+    if (!comentario || !comentario.trim()) {
+      return res.status(400).json({ error: 'El comentario es requerido' });
+    }
+
+    if (!calificacion || calificacion < 1 || calificacion > 5) {
+      return res.status(400).json({ error: 'La calificación debe ser entre 1 y 5' });
+    }
+
+    if (comentario.length > 1000) {
+      return res.status(400).json({ error: 'El comentario no puede exceder los 1000 caracteres' });
+    }
+
+    // Verificar si el usuario ya ha comentado (opcional - para evitar spam)
+    const [comentariosExistentes] = await executeQuery(
+      'SELECT id FROM comentarios_proyecto WHERE usuario_id = ?',
+      [usuario_id]
+    );
+
+    // Si quieres limitar a un comentario por usuario, descomenta esto:
+    // if (comentariosExistentes.length > 0) {
+    //   return res.status(400).json({ error: 'Ya has comentado este proyecto' });
+    // }
+
+    // Insertar nuevo comentario
+    const [result] = await executeQuery(
+      'INSERT INTO comentarios_proyecto (comentario, calificacion, usuario_id) VALUES (?, ?, ?)',
+      [comentario.trim(), calificacion, usuario_id]
+    );
+
+    // Obtener el comentario recién creado con datos del usuario
+    const [nuevoComentario] = await executeQuery(`
+      SELECT 
+        cp.id,
+        cp.comentario,
+        cp.calificacion,
+        cp.creado_en,
+        cp.usuario_id,
+        u.nombre as usuario_nombre,
+        u.foto as usuario_foto
+      FROM comentarios_proyecto cp
+      LEFT JOIN usuarios u ON cp.usuario_id = u.id
+      WHERE cp.id = ?
+    `, [result.insertId]);
+
+    res.status(201).json(nuevoComentario[0]);
+
+  } catch (error) {
+    handleServerError(res, error, 'creando comentario del proyecto');
+  }
+});
+
+// Eliminar comentario del proyecto (solo el autor o admin)
+app.delete('/api/comentarios-proyecto/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const usuario_id = req.user.id;
+
+    // Verificar que el comentario existe y pertenece al usuario
+    const [comentarios] = await executeQuery(
+      'SELECT usuario_id FROM comentarios_proyecto WHERE id = ?',
+      [id]
+    );
+
+    if (comentarios.length === 0) {
+      return res.status(404).json({ error: 'Comentario no encontrado' });
+    }
+
+    const comentario = comentarios[0];
+
+    // Verificar que el usuario es el autor del comentario
+    if (comentario.usuario_id !== usuario_id) {
+      return res.status(403).json({ error: 'No tienes permiso para eliminar este comentario' });
+    }
+
+    // Eliminar el comentario
+    const [result] = await executeQuery(
+      'DELETE FROM comentarios_proyecto WHERE id = ?',
+      [id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Comentario no encontrado' });
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Comentario eliminado correctamente' 
+    });
+
+  } catch (error) {
+    handleServerError(res, error, 'eliminando comentario del proyecto');
+  }
+});
+
+// Obtener estadísticas de comentarios del proyecto
+app.get('/api/comentarios-proyecto/estadisticas', async (req, res) => {
+  try {
+    const [estadisticas] = await executeQuery(`
+      SELECT 
+        COUNT(*) as total_comentarios,
+        AVG(calificacion) as promedio_calificacion,
+        COUNT(CASE WHEN calificacion = 5 THEN 1 END) as cinco_estrellas,
+        COUNT(CASE WHEN calificacion = 4 THEN 1 END) as cuatro_estrellas,
+        COUNT(CASE WHEN calificacion = 3 THEN 1 END) as tres_estrellas,
+        COUNT(CASE WHEN calificacion = 2 THEN 1 END) as dos_estrellas,
+        COUNT(CASE WHEN calificacion = 1 THEN 1 END) as una_estrella
+      FROM comentarios_proyecto
+    `);
+
+    const stats = estadisticas[0];
+    
+    // Calcular porcentajes
+    const total = stats.total_comentarios;
+    const porcentajes = {
+      cinco_estrellas: total > 0 ? (stats.cinco_estrellas / total * 100).toFixed(1) : 0,
+      cuatro_estrellas: total > 0 ? (stats.cuatro_estrellas / total * 100).toFixed(1) : 0,
+      tres_estrellas: total > 0 ? (stats.tres_estrellas / total * 100).toFixed(1) : 0,
+      dos_estrellas: total > 0 ? (stats.dos_estrellas / total * 100).toFixed(1) : 0,
+      una_estrella: total > 0 ? (stats.una_estrella / total * 100).toFixed(1) : 0
+    };
+
+    res.json({
+      total_comentarios: stats.total_comentarios,
+      promedio_calificacion: stats.promedio_calificacion ? parseFloat(stats.promedio_calificacion).toFixed(1) : 0,
+      distribucion: {
+        cinco_estrellas: stats.cinco_estrellas,
+        cuatro_estrellas: stats.cuatro_estrellas,
+        tres_estrellas: stats.tres_estrellas,
+        dos_estrellas: stats.dos_estrellas,
+        una_estrella: stats.una_estrella
+      },
+      porcentajes: porcentajes
+    });
+
+  } catch (error) {
+    handleServerError(res, error, 'obteniendo estadísticas de comentarios');
+  }
 });
 
 // ==================== RUTAS DE AUTENTICACIÓN ====================
@@ -201,7 +372,7 @@ app.post('/api/auth/google', async (req, res) => {
       return res.status(400).json({ error: 'Token de Google es requerido' });
     }
 
-    console.log('🔐 Verificando token de Google...');
+    console.log('Verificando token de Google...');
     
     const ticket = await googleClient.verifyIdToken({
       idToken: token,
@@ -211,7 +382,7 @@ app.post('/api/auth/google', async (req, res) => {
     const payload = ticket.getPayload();
     const { sub: googleId, email, name, picture } = payload;
 
-    console.log('✅ Token verificado, usuario:', email);
+    console.log('Token verificado, usuario:', email);
 
     const [existingUsers] = await executeQuery(
       'SELECT * FROM usuarios WHERE email = ? OR google_id = ?',
@@ -222,7 +393,7 @@ app.post('/api/auth/google', async (req, res) => {
 
     if (existingUsers.length > 0) {
       user = existingUsers[0];
-      console.log('🔄 Usuario existente encontrado:', user.id);
+      console.log('Usuario existente encontrado:', user.id);
       
       if (!user.google_id || !user.foto) {
         await executeQuery(
@@ -231,10 +402,10 @@ app.post('/api/auth/google', async (req, res) => {
         );
         user.google_id = googleId;
         user.foto = picture;
-        console.log('✅ Usuario actualizado con datos de Google');
+        console.log('Usuario actualizado con datos de Google');
       }
     } else {
-      console.log('👤 Creando nuevo usuario con Google...');
+      console.log('Creando nuevo usuario con Google...');
       const [result] = await executeQuery(
         'INSERT INTO usuarios (nombre, email, google_id, foto, password) VALUES (?, ?, ?, ?, ?)',
         [name, email, googleId, picture, '']
@@ -247,7 +418,7 @@ app.post('/api/auth/google', async (req, res) => {
         google_id: googleId,
         foto: picture
       };
-      console.log('✅ Nuevo usuario creado:', user.id);
+      console.log('Nuevo usuario creado:', user.id);
     }
 
     const jwtToken = generateToken({ 
@@ -256,7 +427,7 @@ app.post('/api/auth/google', async (req, res) => {
       googleId: googleId 
     });
 
-    console.log('🎉 Autenticación exitosa, generando JWT...');
+    console.log('Autenticación exitosa, generando JWT...');
 
     res.json({
       message: 'Autenticacion con Google exitosa',
@@ -271,7 +442,7 @@ app.post('/api/auth/google', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error en autenticacion con Google:', error);
+    console.error('Error en autenticacion con Google:', error);
     res.status(500).json({ error: 'Error en autenticacion con Google: ' + error.message });
   }
 });
@@ -336,14 +507,14 @@ app.post('/api/auth/change-password', authenticateToken, async (req, res) => {
       return res.status(500).json({ error: 'Error al actualizar la contraseña' });
     }
 
-    console.log(`✅ Contraseña actualizada para usuario ${userId}`);
+    console.log(`Contraseña actualizada para usuario ${userId}`);
 
     res.json({
       message: 'Contraseña actualizada exitosamente'
     });
 
   } catch (error) {
-    console.error('❌ Error cambiando contraseña:', error);
+    console.error('Error cambiando contraseña:', error);
     res.status(500).json({ error: 'Error interno del servidor al cambiar la contraseña' });
   }
 });
@@ -626,7 +797,7 @@ const geocodeLocation = async (query) => {
   try {
     const response = await axios.get(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json`, {
       params: {
-        access_token: MAPBOX_TOKEN, // CORREGIDO: usar MAPBOX_TOKEN
+        access_token: MAPBOX_TOKEN,
         country: 'mx',
         language: 'es',
       },
@@ -804,10 +975,11 @@ app.use((error, req, res, next) => {
 app.listen(port, () => {
   console.log(`Servidor corriendo en http://localhost:${port}`);
   console.log(`API disponible en http://localhost:${port}/api`);
-  console.log(`✅ Ruta Google Auth: POST http://localhost:${port}/api/auth/google`);
-  console.log(`✅ Ruta Perfil: GET/PUT http://localhost:${port}/api/auth/profile`);
-  console.log(`✅ Ruta Foto Perfil: PUT http://localhost:${port}/api/auth/profile/photo`);
-  console.log(`✅ Ruta Cambiar Contraseña: POST http://localhost:${port}/api/auth/change-password`);
-  console.log(`🔑 JWT Configurado: ${JWT_SECRET ? '✅' : '❌'}`);
-  console.log(`🔑 Google Client ID Configurado: ${GOOGLE_CLIENT_ID ? '✅' : '❌'}`);
+  console.log(`Ruta Comentarios Proyecto: GET/POST http://localhost:${port}/api/comentarios-proyecto`);
+  console.log(`Ruta Google Auth: POST http://localhost:${port}/api/auth/google`);
+  console.log(`Ruta Perfil: GET/PUT http://localhost:${port}/api/auth/profile`);
+  console.log(`Ruta Foto Perfil: PUT http://localhost:${port}/api/auth/profile/photo`);
+  console.log(`Ruta Cambiar Contraseña: POST http://localhost:${port}/api/auth/change-password`);
+  console.log(`JWT Configurado: ${JWT_SECRET ? 'SI' : 'NO'}`);
+  console.log(`Google Client ID Configurado: ${GOOGLE_CLIENT_ID ? 'SI' : 'NO'}`);
 });

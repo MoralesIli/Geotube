@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import Map, { Marker, NavigationControl, Popup } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import YouTube from 'react-youtube';
-import AuthModal from './components/modals/AuthModal';
-import ChangePasswordModal from './components/modals/ChangePasswordModal';
-import ChangePhotoModal from './components/modals/ChangePhotoModal';
+import AuthModal from './components/models/AuthModal';
+import ChangePasswordModal from './components/models/ChangePasswordModal';
+import ChangePhotoModal from './components/models/ChangePhotoModal';
+import CommentsModal from './components/models/CommentsModal';
 
 const MainApp = () => {
   // Estados principales
@@ -26,6 +27,7 @@ const MainApp = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [showCommentsModal, setShowCommentsModal] = useState(false);
   const [user, setUser] = useState(null);
   const [loadingVideos, setLoadingVideos] = useState(false);
   const [activeFilter, setActiveFilter] = useState('mexico');
@@ -179,35 +181,46 @@ const MainApp = () => {
     }
   ], []);
 
-  // Sugerencias populares (usando useMemo)
-  const popularSuggestions = useMemo(() => [
-    'Ciudad de México, México',
-    'Cancún, México',
-    'Guadalajara, México',
-    'Monterrey, México',
-    'Madrid, España',
-    'Barcelona, España',
-    'New York, USA',
-    'Los Angeles, USA',
-    'Tokyo, Japón',
-    'París, Francia',
-    'Londres, Reino Unido',
-    'Roma, Italia',
-    'Buenos Aires, Argentina',
-    'Santiago, Chile',
-    'Bogotá, Colombia',
-    'Lima, Perú',
-    'São Paulo, Brasil',
-    'Berlín, Alemania',
-    'Ámsterdam, Países Bajos',
-    'Estambul, Turquía'
-  ], []);
-
   // PRIMERO: Definir la función para validar tipo de ubicación AL INICIO
   const isValidLocationType = useCallback((feature) => {
     const validTypes = ['country', 'region', 'place', 'locality', 'neighborhood', 'address'];
     return feature.place_type?.some(type => validTypes.includes(type));
   }, []);
+
+  // ✅ NUEVA FUNCIÓN: Verificar si un query es una ubicación (coincidencia exacta)
+  const isLocationQuery = useCallback(async (query) => {
+    if (!query.trim()) return false;
+
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
+        `access_token=${MAPBOX_TOKEN}&types=country,region,place,locality,neighborhood,address&limit=3&language=es`
+      );
+
+      if (!response.ok) return false;
+
+      const data = await response.json();
+      if (!data.features?.length) return false;
+
+      // Buscar coincidencia casi exacta
+      const normalizedQuery = query.trim().toLowerCase();
+      const exactMatch = data.features.find(f =>
+        f.text?.toLowerCase() === normalizedQuery ||
+        f.place_name?.toLowerCase() === normalizedQuery
+      );
+
+      if (exactMatch && isValidLocationType(exactMatch)) {
+        return true;
+      }
+
+      // Si no hay coincidencia exacta, se considera término normal
+      return false;
+
+    } catch (error) {
+      console.warn('Error verificando si es ubicación:', error);
+      return false;
+    }
+  }, [MAPBOX_TOKEN, isValidLocationType]);
 
   // Función para verificar si una ubicación es válida
   const isValidMapLocation = useCallback(async (lat, lng) => {
@@ -493,7 +506,7 @@ const MainApp = () => {
     }
   }, [searchYouTubeVideosByLocation, fetchPopularVideosByRegion, currentRegion]);
 
-  // AHORA: Definir moveMapToLocation después de getLocationCoordinates
+  // Función para mover mapa a ubicación
   const moveMapToLocation = useCallback(async (locationName) => {
     try {
       const locationData = await getLocationCoordinates(locationName);
@@ -571,7 +584,7 @@ const MainApp = () => {
   // Función para obtener sugerencias
   const fetchSuggestions = useCallback(async (query) => {
     if (!query.trim()) {
-      setSuggestions(popularSuggestions);
+      setSuggestions([]);
       return;
     }
 
@@ -597,7 +610,7 @@ const MainApp = () => {
       console.warn('Error obteniendo sugerencias:', error);
       setSuggestions([]);
     }
-  }, [MAPBOX_TOKEN, isValidLocationType, popularSuggestions]);
+  }, [MAPBOX_TOKEN, isValidLocationType]);
 
   // Función para detectar región del usuario
   const detectUserRegion = useCallback(async () => {
@@ -748,7 +761,58 @@ const MainApp = () => {
     }
   }, [API_BASE_URL, user]);
 
-  //  MANEJAR CLIC EN EL MAPA CON VERIFICACIÓN DE RESTRICCIONES - CORREGIDO
+  // Buscar videos para ubicación clickeada - DEFINIDA ANTES DE handleMapClick
+  const searchVideosForClickedLocation = useCallback(async () => {
+    if (!clickedLocation || !isValidLocation) return;
+    
+    setLoadingVideos(true);
+    try {
+      // SIEMPRE usar el término de búsqueda actual si existe
+      // Si no hay término, usar el nombre de la ubicación como término genérico
+      const searchQuery = searchTerm.trim() || clickedLocationName.split(',')[0].trim();
+      
+      console.log('Buscando en ubicación clickeada:', {
+        termino: searchQuery,
+        ubicacion: clickedLocationName,
+        coordenadas: clickedLocation
+      });
+      
+      const result = await searchYouTubeVideosByLocation(
+        clickedLocation.latitude,
+        clickedLocation.longitude,
+        clickedLocationName,
+        searchQuery // <-- Usar SIEMPRE el término de búsqueda actual
+      );
+      
+      if (result.videos.length > 0) {
+        setVideos(result.videos);
+        setNextPageToken(result.nextPageToken);
+        setHasMoreVideos(!!result.nextPageToken);
+        setActiveFilter('clicked');
+        setSearchLocation({
+          latitude: clickedLocation.latitude,
+          longitude: clickedLocation.longitude,
+          name: clickedLocationName
+        });
+        setShowLocationPopup(false);
+        
+        console.log('✅ Búsqueda exitosa en ubicación clickeada:', {
+          query: searchQuery,
+          location: clickedLocationName,
+          videos: result.videos.length
+        });
+      } else {
+        alert(`No se encontraron videos de "${searchQuery}" en ${clickedLocationName}`);
+      }
+    } catch (error) {
+      console.error('Error buscando videos:', error);
+      alert(`Error al buscar videos de "${searchTerm}" en ${clickedLocationName}`);
+    } finally {
+      setLoadingVideos(false);
+    }
+  }, [clickedLocation, isValidLocation, clickedLocationName, searchTerm, searchYouTubeVideosByLocation]);
+
+  // MANEJAR CLIC EN EL MAPA CON VERIFICACIÓN DE RESTRICCIONES - CORREGIDO
   const handleMapClick = useCallback(async (event) => {
     const { lngLat } = event;
     const clickedLat = lngLat.lat;
@@ -813,6 +877,13 @@ const MainApp = () => {
             zoom: 10
           });
         }, 100);
+
+        // 🔹 NUEVO: Buscar automáticamente videos del término actual en la ubicación clickeada
+        if (searchTerm.trim()) {
+          setTimeout(() => {
+            searchVideosForClickedLocation();
+          }, 500);
+        }
       } else {
         setIsValidLocation(false);
         setClickedLocation({ latitude: clickedLat, longitude: clickedLng });
@@ -838,7 +909,7 @@ const MainApp = () => {
     } finally {
       setLoadingVideos(false);
     }
-  }, [isValidMapLocation, restrictedCountries, checkRestrictions, isAnimating]);
+  }, [isValidMapLocation, restrictedCountries, checkRestrictions, isAnimating, searchTerm, searchVideosForClickedLocation]);
 
   // BUSCAR VIDEOS POR CATEGORÍA CON VERIFICACIÓN DE RESTRICCIONES - MODIFICADA PARA PAGINACIÓN
   const searchVideosByCategory = useCallback(async (category, pageToken = '', isLoadMore = false) => {
@@ -955,40 +1026,6 @@ const MainApp = () => {
       }
     }
   }, [clickedLocation, isValidLocation, clickedLocationName, userLocation, userLocationName, isValidMapLocation, checkRestrictions, searchYouTubeVideosByLocation]);
-
-  // Buscar videos para ubicación clickeada
-  const searchVideosForClickedLocation = useCallback(async () => {
-    if (!clickedLocation || !isValidLocation) return;
-    
-    setLoadingVideos(true);
-    try {
-      const result = await searchYouTubeVideosByLocation(
-        clickedLocation.latitude,
-        clickedLocation.longitude,
-        clickedLocationName
-      );
-      
-      if (result.videos.length > 0) {
-        setVideos(result.videos);
-        setNextPageToken(result.nextPageToken);
-        setHasMoreVideos(!!result.nextPageToken);
-        setActiveFilter('clicked');
-        setSearchLocation({
-          latitude: clickedLocation.latitude,
-          longitude: clickedLocation.longitude,
-          name: clickedLocationName
-        });
-        setShowLocationPopup(false);
-      } else {
-        alert('No se encontraron videos para esta ubicación');
-      }
-    } catch (error) {
-      console.error('Error buscando videos:', error);
-      alert('Error al buscar videos para esta ubicación');
-    } finally {
-      setLoadingVideos(false);
-    }
-  }, [clickedLocation, isValidLocation, clickedLocationName, searchYouTubeVideosByLocation]);
 
   // CARGAR VIDEOS CERCANOS - MODIFICADO para funcionar con ubicación clickeada
   const fetchOtherVideos = useCallback(async () => {
@@ -1159,7 +1196,7 @@ const MainApp = () => {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [targetViewport]); // Eliminamos viewport de las dependencias
+  }, [targetViewport]);
 
   // Efecto para manejar clics fuera del dropdown de sugerencias
   useEffect(() => {
@@ -1225,7 +1262,7 @@ const MainApp = () => {
     initializeApp();
   }, [API_BASE_URL, MAPBOX_TOKEN, YOUTUBE_API_KEY, checkYouTubeAvailability, detectUserRegion, fetchPopularVideosByRegion, loadVideosForLocation]);
 
-  // Obtener ubicación del usuario - CORREGIDO
+  // Obtener ubicación del usuario - MODIFICADO para borrar ubicación seleccionada
   const getUserLocation = useCallback(async () => {
     if (!navigator.geolocation) {
       alert('La geolocalización no es compatible con este navegador.');
@@ -1234,6 +1271,12 @@ const MainApp = () => {
 
     // Si ya hay animación, no hacer nada
     if (isAnimating) return;
+
+    // BORRAR UBICACIÓN SELECCIONADA AL ACTIVAR LA UBICACIÓN ACTUAL
+    setClickedLocation(null);
+    setClickedLocationName('');
+    setIsValidLocation(false);
+    setShowLocationPopup(false);
 
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -1294,7 +1337,7 @@ const MainApp = () => {
     );
   }, [getLocationName, loadVideosForLocation, fetchPopularVideosByRegion, currentRegion, checkRestrictions, isValidMapLocation, isAnimating]);
 
-  // BÚSQUEDA MEJORADA CON VERIFICACIÓN COMPLETA DE RESTRICCIONES - MODIFICADA PARA PAGINACIÓN
+  // BÚSQUEDA MEJORADA - MODIFICADA PARA USAR UBICACIÓN SELECCIONADA
   const fetchVideos = useCallback(async (query, pageToken = '', isLoadMore = false) => {
     if (!query.trim() && !isLoadMore) {
       setSearchError('Por favor ingresa un término de búsqueda válido.');
@@ -1312,70 +1355,59 @@ const MainApp = () => {
     try {
       let latitude, longitude, locationName;
 
-      // Determinar qué ubicación usar
+      // PRIORIDAD: Usar ubicación clickeada si está disponible y es válida
       if (clickedLocation && isValidLocation) {
-        // Usar ubicación clickeada en el mapa
         latitude = clickedLocation.latitude;
         longitude = clickedLocation.longitude;
         locationName = clickedLocationName;
         
-        // VERIFICAR RESTRICCIONES para ubicación clickeada
-        const locationCheck = await isValidMapLocation(latitude, longitude);
-        const restrictionCheck = checkRestrictions(locationName, {
-          countryCode: locationCheck.countryCode,
-          locationName: locationName
-        });
+        console.log('Usando ubicación clickeada:', locationName);
         
-        if (restrictionCheck.restricted) {
-          alert(restrictionCheck.message);
-          return;
-        }
-        
-      } else if (userLocation) {
-        // Usar ubicación actual del usuario
+      } 
+      // SEGUNDA OPCIÓN: Usar ubicación actual del usuario
+      else if (userLocation) {
         latitude = userLocation.latitude;
         longitude = userLocation.longitude;
         locationName = userLocationName;
         
-        // VERIFICAR RESTRICCIONES para ubicación actual
-        const locationCheck = await isValidMapLocation(latitude, longitude);
-        const restrictionCheck = checkRestrictions(locationName, {
-          countryCode: locationCheck.countryCode,
-          locationName: locationName
-        });
-        
-        if (restrictionCheck.restricted) {
-          alert(restrictionCheck.message);
-          return;
-        }
-        
-      } else {
-        // Buscar la ubicación por nombre
-        const locationData = await getLocationCoordinates(query.split(',')[0]);
-        latitude = locationData.latitude;
-        longitude = locationData.longitude;
-        locationName = locationData.locationName;
+        console.log('Usando ubicación actual:', locationName);
+      } 
+      // TERCERA OPCIÓN: Buscar la ubicación por nombre del término de búsqueda
+      else {
+        // Primero verificar si el query es realmente una ubicación (coincidencia exacta)
+        const isLocation = await isLocationQuery(query);
+        if (isLocation) {
+          const locationData = await getLocationCoordinates(query.split(',')[0]);
+          latitude = locationData.latitude;
+          longitude = locationData.longitude;
+          locationName = locationData.locationName;
 
-        // VERIFICAR RESTRICCIONES para búsqueda por nombre
-        const restrictionCheck = checkRestrictions(query, locationData);
-        if (restrictionCheck.restricted) {
-          alert(restrictionCheck.message);
-          return;
-        }
-
-        if (!isLoadMore) {
-          setTargetViewport({ 
-            latitude: latitude, 
-            longitude: longitude, 
-            zoom: 10 
-          });
+          if (!isLoadMore) {
+            setTargetViewport({ 
+              latitude: latitude, 
+              longitude: longitude, 
+              zoom: 10 
+            });
+          }
+          
+          console.log('Buscando ubicación para:', query, '->', locationName);
+        } else {
+          // Si no es una ubicación exacta, usar ubicación actual o mostrar error
+          if (userLocation) {
+            latitude = userLocation.latitude;
+            longitude = userLocation.longitude;
+            locationName = userLocationName;
+            console.log('Término normal, usando ubicación actual:', locationName);
+          } else {
+            throw new Error('Primero activa tu ubicación o selecciona una en el mapa');
+          }
         }
       }
 
-      // VERIFICACIÓN FINAL antes de buscar videos
-      const finalLocationCheck = await isValidMapLocation(latitude, longitude);
+      // VERIFICAR RESTRICCIONES
+      const locationCheck = await isValidMapLocation(latitude, longitude);
       const finalRestrictionCheck = checkRestrictions(query, {
-        countryCode: finalLocationCheck.countryCode,
+        countryCode: locationCheck.countryCode,
         locationName: locationName
       });
       
@@ -1384,12 +1416,12 @@ const MainApp = () => {
         return;
       }
 
-      // Si pasa todas las verificaciones, buscar videos
+      // Buscar videos usando el término de búsqueda PERO en la ubicación seleccionada
       const result = await searchYouTubeVideosByLocation(
         latitude,
         longitude,
         locationName,
-        query,
+        query, // <-- Aquí se usa el término de búsqueda
         pageToken
       );
 
@@ -1404,7 +1436,6 @@ const MainApp = () => {
         setHasMoreVideos(!!result.nextPageToken);
         
         if (!isLoadMore) {
-          setUserLocationName(locationName);
           setActiveFilter('search');
           setSearchLocation({
             latitude: latitude,
@@ -1412,10 +1443,16 @@ const MainApp = () => {
             name: locationName
           });
           setShowSuggestions(false);
+          
+          console.log('Búsqueda completada:', {
+            query: query,
+            location: locationName,
+            videos: result.videos.length
+          });
         }
       } else {
         if (!isLoadMore) {
-          throw new Error('No se encontraron videos para esta búsqueda');
+          throw new Error('No se encontraron videos para esta búsqueda en ' + locationName);
         }
       }
     } catch (error) {
@@ -1436,7 +1473,7 @@ const MainApp = () => {
         setLoadingVideos(false);
       }
     }
-  }, [getLocationCoordinates, searchYouTubeVideosByLocation, clickedLocation, isValidLocation, clickedLocationName, userLocation, userLocationName, checkRestrictions, isValidMapLocation]);
+  }, [getLocationCoordinates, searchYouTubeVideosByLocation, clickedLocation, isValidLocation, clickedLocationName, userLocation, userLocationName, checkRestrictions, isValidMapLocation, isLocationQuery]);
 
   // NUEVA FUNCIÓN PARA CARGAR MÁS VIDEOS
   const loadMoreVideos = useCallback(async () => {
@@ -1452,7 +1489,7 @@ const MainApp = () => {
           clickedLocation.latitude,
           clickedLocation.longitude,
           clickedLocationName,
-          '',
+          searchTerm.trim() || '', // Usar término de búsqueda si existe
           nextPageToken
         );
         
@@ -1485,7 +1522,7 @@ const MainApp = () => {
     }
   }, [nextPageToken, isLoadingMore, activeFilter, fetchVideos, searchTerm, searchVideosByCategory, selectedCategory, searchYouTubeVideosByLocation, clickedLocation, clickedLocationName, userLocation, userLocationName]);
 
-  // MODIFICADA: Función para manejar clic en sugerencias - Ahora mueve el mapa también
+  // MODIFICADA: Función para manejar clic en sugerencias
   const handleSuggestionClick = useCallback(async (suggestion) => {
     setSearchTerm(suggestion);
     setShowSuggestions(false);
@@ -1493,9 +1530,10 @@ const MainApp = () => {
     // Mover el mapa a la ubicación seleccionada
     await moveMapToLocation(suggestion);
     
-    // Buscar videos para esa ubicación
-    fetchVideos(suggestion);
-  }, [moveMapToLocation, fetchVideos]);
+    // IMPORTANTE: No buscar videos inmediatamente después de mover el mapa
+    // Esperar a que el usuario haga clic en la ubicación o use el buscador
+    console.log('Ubicación seleccionada:', suggestion, '- Esperando confirmación de ubicación');
+  }, [moveMapToLocation]);
 
   // Handlers para el buscador con sugerencias
   const handleSearchChange = useCallback((e) => {
@@ -1507,14 +1545,15 @@ const MainApp = () => {
       fetchSuggestions(value);
       setShowSuggestions(true);
     } else {
-      setSuggestions(popularSuggestions);
-      setShowSuggestions(true);
+      setSuggestions([]);
+      setShowSuggestions(false);
     }
-  }, [fetchSuggestions, popularSuggestions]);
+  }, [fetchSuggestions]);
 
   const handleSearchSubmit = useCallback((e) => {
     e.preventDefault();
     if (searchTerm.trim()) {
+      // Siempre buscar usando el término actual en el input
       fetchVideos(searchTerm);
       setShowSuggestions(false);
     } else {
@@ -1523,11 +1562,8 @@ const MainApp = () => {
   }, [searchTerm, fetchVideos]);
 
   const handleSearchFocus = useCallback(() => {
-    if (!suggestions.length) {
-      setSuggestions(popularSuggestions);
-    }
     setShowSuggestions(true);
-  }, [suggestions.length, popularSuggestions]);
+  }, []);
 
   // Handlers de UI
   const handleLogin = useCallback((userData) => {
@@ -1543,7 +1579,7 @@ const MainApp = () => {
   const handleLogout = useCallback(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    localStorage.removeItem('selectedLocation'); // Limpiar ubicación seleccionada
+    localStorage.removeItem('selectedLocation');
     setUser(null);
     setShowProfile(false);
     setShowSettings(false);
@@ -1566,7 +1602,6 @@ const MainApp = () => {
       registerVideoAccess(video);
     }
     
-    // Pasar la ubicación seleccionada al VideoPlayer
     const locationState = {};
     
     if (clickedLocation && isValidLocation) {
@@ -1583,7 +1618,6 @@ const MainApp = () => {
       };
     }
     
-    // Guardar también en localStorage como backup
     if (locationState.selectedLocation) {
       localStorage.setItem('selectedLocation', JSON.stringify(locationState.selectedLocation));
     }
@@ -1605,7 +1639,6 @@ const MainApp = () => {
       registerVideoAccess(video);
     }
     
-    // Pasar la ubicación seleccionada al VideoPlayer
     const locationState = {};
     
     if (clickedLocation && isValidLocation) {
@@ -1622,7 +1655,6 @@ const MainApp = () => {
       };
     }
     
-    // Guardar también en localStorage como backup
     if (locationState.selectedLocation) {
       localStorage.setItem('selectedLocation', JSON.stringify(locationState.selectedLocation));
     }
@@ -1637,7 +1669,6 @@ const MainApp = () => {
       registerVideoAccess(selectedVideo);
     }
     
-    // Pasar la ubicación seleccionada al VideoPlayer
     const locationState = {};
     
     if (clickedLocation && isValidLocation) {
@@ -1654,7 +1685,6 @@ const MainApp = () => {
       };
     }
     
-    // Guardar también en localStorage como backup
     if (locationState.selectedLocation) {
       localStorage.setItem('selectedLocation', JSON.stringify(locationState.selectedLocation));
     }
@@ -1740,39 +1770,6 @@ const MainApp = () => {
     );
   }, [showSuggestions, suggestions, handleSuggestionClick]);
 
-  // Componente de Categorías en el Mapa
-  const MapCategories = useCallback(() => {
-    const hasValidLocation = (clickedLocation && isValidLocation) || userLocation;
-    
-    return (
-      <div className="absolute top-6 left-6 glass-effect bg-gray-800/80 backdrop-blur-md rounded-2xl p-4 shadow-2xl border border-gray-600">
-        <div className="flex flex-col gap-2">
-          <p className="text-cyan-400 text-sm font-semibold mb-2 text-center">Categorías</p>
-          {categories.map((category) => (
-            <button
-              key={category.id}
-              onClick={() => searchVideosByCategory(category)}
-              disabled={!hasValidLocation}
-              className={`flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-white transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed text-sm ${
-                selectedCategory?.id === category.id 
-                  ? `ring-2 ring-white ${category.bgColor}`
-                  : `bg-gradient-to-r ${category.color} hover:shadow-lg`
-              }`}
-              title={hasValidLocation ? category.name : 'Primero activa tu ubicación o selecciona una en el mapa'}
-            >
-              <span className="font-medium">{category.name}</span>
-            </button>
-          ))}
-        </div>
-        {!hasValidLocation && (
-          <p className="text-xs text-gray-400 mt-2 text-center">
-            Activa tu ubicación o selecciona una en el mapa
-          </p>
-        )}
-      </div>
-    );
-  }, [clickedLocation, isValidLocation, userLocation, searchVideosByCategory, selectedCategory, categories]);
-
   // Modal de Historial
   const HistoryModal = useCallback(() => {
     if (!showHistoryModal) return null;
@@ -1780,7 +1777,6 @@ const MainApp = () => {
     return (
       <div className="modal-overlay fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div className="modal-content w-full max-w-4xl bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl shadow-2xl border border-cyan-500/20 max-h-[90vh] overflow-hidden">
-          {/* Header */}
           <div className="relative p-8 bg-gradient-to-r from-cyan-900/50 to-blue-900/50 border-b border-cyan-500/30">
             <div className="flex items-center justify-between">
               <div>
@@ -1800,7 +1796,6 @@ const MainApp = () => {
             </div>
           </div>
 
-          {/* Content */}
           <div className="p-6 overflow-y-auto max-h-[60vh]">
             {userHistory.length === 0 ? (
               <div className="text-center py-12">
@@ -1840,7 +1835,6 @@ const MainApp = () => {
             )}
           </div>
 
-          {/* Footer */}
           {userHistory.length > 0 && (
             <div className="p-6 bg-gray-900/50 border-t border-gray-700">
               <div className="flex gap-3">
@@ -1864,14 +1858,13 @@ const MainApp = () => {
     );
   }, [showHistoryModal, userHistory, clearUserHistory]);
 
-  // Modal de Ajustes Simplificado - Solo Historial
+  // Modal de Ajustes con Comentarios del Proyecto
   const SettingsModal = useCallback(() => {
     if (!showSettings) return null;
 
     return (
       <div className="modal-overlay fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div className="modal-content w-full max-w-md bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl shadow-2xl border border-cyan-500/20">
-          {/* Header */}
           <div className="p-6 bg-gradient-to-r from-cyan-900/50 to-blue-900/50 border-b border-cyan-500/30 rounded-t-3xl">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
@@ -1886,18 +1879,23 @@ const MainApp = () => {
             </div>
           </div>
 
-          {/* Content - Solo Historial */}
           <div className="p-6">
             <div className="space-y-4">
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-cyan-500/10 flex items-center justify-center">
-                  <svg className="w-8 h-8 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              {/* Botón para Comentarios del Proyecto */}
+              <button 
+                onClick={() => {
+                  setShowSettings(false);
+                  setShowCommentsModal(true);
+                }}
+                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105"
+              >
+                <div className="flex items-center gap-3 justify-center">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                   </svg>
+                  <span>Comentarios del Proyecto</span>
                 </div>
-                <h3 className="text-lg font-semibold text-cyan-300">Historial de Visualización</h3>
-                <p className="text-gray-400 text-sm mt-1">Gestiona tu historial de videos vistos</p>
-              </div>
+              </button>
 
               <button 
                 onClick={async () => {
@@ -1946,13 +1944,13 @@ const MainApp = () => {
         </div>
       </div>
     );
-  }, [showSettings, fetchUserHistory, clearUserHistory, setShowHistoryModal]);
+  }, [showSettings, fetchUserHistory, clearUserHistory]);
 
   return (
     <div className="flex h-screen w-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 text-white overflow-hidden">
       {/* Navbar */}
       <div className="navbar absolute top-0 left-0 w-full h-20 flex items-center justify-between px-8 z-50">
-        <div className="flex items-center gap-8">
+        <div className="flex items-center gap-6">
           <div className="flex items-center gap-4">
             <h1 className="text-3xl font-bold text-gradient bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
               VideoMap Pro
@@ -1967,6 +1965,56 @@ const MainApp = () => {
                 </p>
               </div>
             )}
+          </div>
+          
+          {/* Indicador de ubicación activa */}
+          <div className="flex items-center gap-4 ml-4">
+            {(clickedLocation && isValidLocation) && (
+              <div className="bg-cyan-500/20 border border-cyan-500/50 rounded-lg px-3 py-1">
+                <p className="text-cyan-300 text-sm font-medium flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Ubicación: {clickedLocationName.split(',')[0]}
+                </p>
+              </div>
+            )}
+            
+            {userLocationName && !clickedLocation && (
+              <div className="bg-green-500/20 border border-green-500/50 rounded-lg px-3 py-1">
+                <p className="text-green-300 text-sm font-medium flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Ubicación: {userLocationName.split(',')[0]}
+                </p>
+              </div>
+            )}
+          </div>
+          
+          {/* CATEGORÍAS EN COLUMNAS AL LADO DEL BUSCADOR */}
+          <div className="flex items-center gap-2">
+            {categories.map((category) => {
+              const hasValidLocation = (clickedLocation && isValidLocation) || userLocation;
+              
+              return (
+                <button
+                  key={category.id}
+                  onClick={() => searchVideosByCategory(category)}
+                  disabled={!hasValidLocation}
+                  className={`flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-white transition-all duration-200 transform hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium min-w-[90px] ${
+                    selectedCategory?.id === category.id 
+                      ? `ring-1 ring-white ${category.bgColor}`
+                      : `bg-gradient-to-r ${category.color} hover:shadow-md`
+                  }`}
+                  title={hasValidLocation ? category.name : 'Primero activa tu ubicación o selecciona una en el mapa'}
+                >
+                  <span className="truncate">{category.name}</span>
+                </button>
+              );
+            })}
           </div>
           
           <div className="relative">
@@ -2160,6 +2208,12 @@ const MainApp = () => {
         onPhotoUpdate={handlePhotoUpdate}
       />
 
+      <CommentsModal 
+        isOpen={showCommentsModal}
+        onClose={() => setShowCommentsModal(false)}
+        user={user}
+      />
+
       <HistoryModal />
       <SettingsModal />
 
@@ -2202,17 +2256,34 @@ const MainApp = () => {
                         </span>
                       </p>
 
-                      <div className="flex gap-2">
+                      <div className="space-y-2">
+                        {/* Botón para buscar videos generales de la ubicación */}
                         <button
                           onClick={searchVideosForClickedLocation}
                           disabled={loadingVideos}
-                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium shadow-md transition-all duration-200 disabled:opacity-50"
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium shadow-md transition-all duration-200 disabled:opacity-50"
                         >
-                          {loadingVideos ? 'Buscando...' : 'Buscar Videos'}
+                          {loadingVideos ? 'Buscando...' : 'Videos de esta Ubicación'}
                         </button>
+
+                        {/* Botón para buscar con el término actual si existe */}
+                        {searchTerm.trim() && (
+                          <button
+                            onClick={() => {
+                              // Buscar el término actual en esta ubicación clickeada
+                              fetchVideos(searchTerm);
+                              setShowLocationPopup(false);
+                            }}
+                            disabled={loadingVideos}
+                            className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm font-medium shadow-md transition-all duration-200 disabled:opacity-50"
+                          >
+                            {loadingVideos ? 'Buscando...' : `Buscar "${searchTerm}" aquí`}
+                          </button>
+                        )}
+
                         <button
                           onClick={() => setShowLocationPopup(false)}
-                          className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg text-sm font-medium shadow-md transition-all duration-200"
+                          className="w-full bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg text-sm font-medium shadow-md transition-all duration-200"
                         >
                           Cerrar
                         </button>
@@ -2277,9 +2348,6 @@ const MainApp = () => {
               </Marker>
             ))}
           </Map>
-
-          {/* Botones de categorías flotantes - SOLO EN EL MAPA */}
-          <MapCategories />
 
           <button
             onClick={getUserLocation}
@@ -2467,7 +2535,6 @@ const MainApp = () => {
                       </div>
                     ))}
                     
-                    {/* BOTÓN MOSTRAR MÁS VIDEOS - AGREGADO */}
                     {hasMoreVideos && (
                       <div className="flex justify-center mt-6 mb-4">
                         <button
