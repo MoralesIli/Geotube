@@ -68,7 +68,7 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
       const data = await response.json();
 
       if (response.ok) {
-        setMessage('✅ ' + data.message);
+        setMessage(' ' + data.message);
         setFormData({ 
           currentPassword: '', 
           newPassword: '', 
@@ -78,11 +78,11 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
           onClose();
         }, 2000);
       } else {
-        setError('❌ ' + (data.error || 'Error al cambiar la contraseña'));
+        setError(' ' + (data.error || 'Error al cambiar la contraseña'));
       }
     } catch (error) {
       console.error('Error cambiando contraseña:', error);
-      setError('❌ Error de conexión con el servidor');
+      setError(' Error de conexión con el servidor');
     } finally {
       setLoading(false);
     }
