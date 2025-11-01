@@ -103,7 +103,7 @@ const ChangePhotoModal = ({ isOpen, onClose, user, onPhotoUpdate }) => {
       setPreviewUrl('');
 
     } catch (err) {
-      console.error('❌ Error en upload:', err);
+      console.error(' Error en upload:', err);
       
       if (err.message.includes('Failed to fetch')) {
         setError('No se pudo conectar al servidor. Verifica que esté corriendo.');
@@ -128,7 +128,7 @@ const ChangePhotoModal = ({ isOpen, onClose, user, onPhotoUpdate }) => {
     try {
       const token = localStorage.getItem('token');
       
-      console.log('🗑️ Eliminando foto de perfil...');
+      console.log(' Eliminando foto de perfil...');
       
       const response = await fetch('http://localhost:3001/api/auth/profile/photo', {
         method: 'PUT',
@@ -139,7 +139,7 @@ const ChangePhotoModal = ({ isOpen, onClose, user, onPhotoUpdate }) => {
         body: JSON.stringify({ foto: null })
       });
 
-      console.log('📥 Respuesta del servidor:', response.status);
+      console.log(' Respuesta del servidor:', response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -151,10 +151,10 @@ const ChangePhotoModal = ({ isOpen, onClose, user, onPhotoUpdate }) => {
         }
       }
 
-      // ✅ CORREGIDO: Removí la variable 'data' que no se usaba
+      //  CORREGIDO: Removí la variable 'data' que no se usaba
       await response.json();
 
-      console.log('✅ Foto eliminada correctamente');
+      console.log('Foto eliminada correctamente');
 
       // Actualizar localStorage y estado
       const currentUser = JSON.parse(localStorage.getItem('user'));
@@ -173,7 +173,7 @@ const ChangePhotoModal = ({ isOpen, onClose, user, onPhotoUpdate }) => {
       onClose();
 
     } catch (err) {
-      console.error('❌ Error eliminando foto:', err);
+      console.error(' Error eliminando foto:', err);
       
       if (err.message.includes('Failed to fetch')) {
         setError('No se pudo conectar al servidor. Verifica que esté corriendo.');

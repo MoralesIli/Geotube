@@ -80,11 +80,11 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
     script.async = true;
     script.defer = true;
     script.onload = () => {
-      console.log('✅ Google Auth script cargado correctamente');
+      console.log(' Google Auth script cargado correctamente');
       setGoogleLoaded(true);
     };
     script.onerror = () => {
-      console.error('❌ Error cargando Google Auth script');
+      console.error(' Error cargando Google Auth script');
       setError('Error al cargar Google Auth');
       setGoogleLoaded(false);
     };
@@ -98,12 +98,12 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
     }
 
     try {
-      console.log('🔄 Iniciando autenticación Google con popup...');
+      console.log(' Iniciando autenticación Google con popup...');
       
       window.google.accounts.id.initialize({
         client_id: '369281279205-mj2fc1oeoe56884ubitisfh51bm09us8.apps.googleusercontent.com',
         callback: handleGoogleResponse,
-        ux_mode: 'popup', // 🔥 popup forzado
+        ux_mode: 'popup',
         auto_select: false,
         cancel_on_tap_outside: true,
       });
@@ -111,7 +111,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       // Mostrar siempre el popup directamente
       window.google.accounts.id.prompt();
     } catch (error) {
-      console.error('❌ Error initializing Google Auth:', error);
+      console.error(' Error initializing Google Auth:', error);
       setError('Error al inicializar Google Auth');
     }
   };
@@ -170,7 +170,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
 
       const data = await backendResponse.json();
 
-      console.log('🎉 Login exitoso con Google:', data.user);
+      console.log(' Login exitoso con Google:', data.user);
       
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
@@ -179,7 +179,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       onClose();
 
     } catch (err) {
-      console.error('❌ Google auth error:', err);
+      console.error(' Google auth error:', err);
       
       if (err.message.includes('Failed to fetch')) {
         setError('No se pudo conectar al servidor. Verifica que esté corriendo en localhost:3001');
@@ -233,7 +233,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
         ? { email: formData.email, password: formData.password }
         : { nombre: formData.nombre, email: formData.email, password: formData.password };
 
-      console.log('📤 Enviando datos a:', endpoint, payload);
+      console.log(' Enviando datos a:', endpoint, payload);
 
       const response = await fetch(`http://localhost:3001/api/auth${endpoint}`, {
         method: 'POST',
@@ -255,7 +255,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
 
       const data = await response.json();
 
-      console.log('🎉 Login/Register exitoso:', data.user);
+      console.log(' Login/Register exitoso:', data.user);
       
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
@@ -271,7 +271,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       setShowConfirmPassword(false);
 
     } catch (err) {
-      console.error('❌ Error en auth:', err);
+      console.error(' Error en auth:', err);
       setError(err.message);
     } finally {
       setLoading(false);
