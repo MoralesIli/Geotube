@@ -50,7 +50,7 @@ const db = mysql.createPool({
 // });
 
 const allowedOrigins = [
-  "https://geotube-one.vercel.app/", //  fronted en producción
+  "https://geotube-one.vercel.app", //  fronted en producción
   "http://localhost:3000", // útil para desarrollo local
 ];
 
