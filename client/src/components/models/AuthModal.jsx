@@ -100,7 +100,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
 
     try {
       console.log(' Iniciando autenticación Google con popup...');
-      
+
       window.google.accounts.id.initialize({
         client_id: '64896853965-i3j6cddp5can0ir6evl5ope0gv3jvou4.apps.googleusercontent.com',
         callback: handleGoogleResponse,
@@ -156,6 +156,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
         body: JSON.stringify({ token: response.credential }),
       });
 
+
       console.log('📥 Respuesta del backend recibida, status:', backendResponse.status);
 
       if (!backendResponse.ok) {
@@ -172,16 +173,16 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       const data = await backendResponse.json();
 
       console.log(' Login exitoso con Google:', data.user);
-      
+
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
-      
+
       onLogin(data.user);
       onClose();
 
     } catch (err) {
       console.error(' Google auth error:', err);
-      
+
       if (err.message.includes('Failed to fetch')) {
         setError(`No se pudo conectar al servidor. Verifica que esté corriendo en ${API_BASE_URL}`);
       } else if (err.message.includes('404') || err.message.includes('Cannot POST')) {
@@ -257,10 +258,10 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       const data = await response.json();
 
       console.log(' Login/Register exitoso:', data.user);
-      
+
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
-      
+
       onLogin(data.user);
       onClose();
 
@@ -329,7 +330,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
             </svg>
             {loading ? 'Cargando...' : 'Continuar con Google'}
           </button>
-          
+
           {!googleLoaded && (
             <p className="text-xs text-yellow-500 mt-2 text-center">
               Cargando Google Auth...
