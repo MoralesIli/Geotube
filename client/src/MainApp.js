@@ -976,7 +976,7 @@ const MainApp = () => {
             )}
 
             {/* Indicador de ubicación de búsqueda */}
-            <div className="text-xs text-gray-400 ml-4">
+            {/* <div className="text-xs text-gray-400 ml-4">
               {clickedLocation && isValidLocation ? (
                 <span> Buscarás en: <strong>{clickedLocationName.split(',')[0]}</strong></span>
               ) : userLocation ? (
@@ -984,7 +984,7 @@ const MainApp = () => {
               ) : (
                 <span>Activa ubicación o selecciona en el mapa</span>
               )}
-            </div>
+            </div> */}
           </div>
           
           {/* CATEGORÍAS EN COLUMNAS AL LADO DEL BUSCADOR */}
@@ -1057,8 +1057,8 @@ const MainApp = () => {
         <div className="flex items-center gap-6">
           {userLocationName && (
             <div className="text-right">
-              <p className="text-sm text-cyan-400">Tu ubicación actual</p>
-              <p className="text-xs text-gray-300">{userLocationName}</p>
+              {/* <p className="text-sm text-cyan-400">Tu ubicación actual</p> */}
+              {/* <p className="text-xs text-gray-300">{userLocationName}</p> */}
             </div>
           )}
           {user ? (
