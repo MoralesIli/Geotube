@@ -11,6 +11,7 @@ const ProfileModal = ({ isOpen, onClose, user, onUpdateUser }) => {
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const API_BASE_URL = process.env.REACT_APP_API_URL;
 
   if (!isOpen) return null;
 
@@ -20,7 +21,7 @@ const ProfileModal = ({ isOpen, onClose, user, onUpdateUser }) => {
     
     try {
       // Aquí iría la llamada a la API para actualizar el perfil
-      const response = await fetch('http://localhost:3001/api/auth/profile', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -55,7 +56,7 @@ const ProfileModal = ({ isOpen, onClose, user, onUpdateUser }) => {
     
     try {
       // Aquí iría la llamada a la API para cambiar la contraseña
-      const response = await fetch('http://localhost:3001/api/auth/change-password', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

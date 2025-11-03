@@ -23,6 +23,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const API_BASE_URL = process.env.REACT_APP_API_URL;
 
   const passwordRules = {
     length: (pwd) => pwd.length >= 8,
@@ -101,7 +102,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       console.log(' Iniciando autenticación Google con popup...');
       
       window.google.accounts.id.initialize({
-        client_id: '369281279205-mj2fc1oeoe56884ubitisfh51bm09us8.apps.googleusercontent.com',
+        client_id: '64896853965-i3j6cddp5can0ir6evl5ope0gv3jvou4.apps.googleusercontent.com',
         callback: handleGoogleResponse,
         ux_mode: 'popup',
         auto_select: false,
@@ -147,7 +148,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       console.log('✅ Google response received, token length:', response.credential.length);
       console.log('📤 Enviando token al backend...');
 
-      const backendResponse = await fetch('http://localhost:3001/api/auth/google', {
+      const backendResponse = await fetch(`${API_BASE_URL}/api/auth/google`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -182,7 +183,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       console.error(' Google auth error:', err);
       
       if (err.message.includes('Failed to fetch')) {
-        setError('No se pudo conectar al servidor. Verifica que esté corriendo en localhost:3001');
+        setError(`No se pudo conectar al servidor. Verifica que esté corriendo en ${API_BASE_URL}`);
       } else if (err.message.includes('404') || err.message.includes('Cannot POST')) {
         setError('Error: La ruta /api/auth/google no existe en el servidor. Verifica el backend.');
       } else {
@@ -235,7 +236,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
 
       console.log(' Enviando datos a:', endpoint, payload);
 
-      const response = await fetch(`http://localhost:3001/api/auth${endpoint}`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

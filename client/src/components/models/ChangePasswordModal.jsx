@@ -9,7 +9,7 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-
+  const API_BASE_URL = process.env.REACT_APP_API_URL;
   if (!isOpen) return null;
 
   const handleChange = (e) => {
@@ -52,8 +52,8 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
 
     try {
       const token = localStorage.getItem('token');
-      
-      const response = await fetch('http://localhost:3001/api/auth/change-password', {
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -69,10 +69,10 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
 
       if (response.ok) {
         setMessage(' ' + data.message);
-        setFormData({ 
-          currentPassword: '', 
-          newPassword: '', 
-          confirmPassword: '' 
+        setFormData({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: ''
         });
         setTimeout(() => {
           onClose();
@@ -102,7 +102,7 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
           <h2 className="text-2xl font-bold text-gradient bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
             Cambiar Contraseña
           </h2>
-          <button 
+          <button
             onClick={handleCancel}
             className="text-gray-400 hover:text-white text-2xl transition-colors"
             disabled={loading}

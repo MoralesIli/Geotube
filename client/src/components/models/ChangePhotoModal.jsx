@@ -5,6 +5,7 @@ const ChangePhotoModal = ({ isOpen, onClose, user, onPhotoUpdate }) => {
   const [previewUrl, setPreviewUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const API_BASE_URL = process.env.REACT_APP_API_URL;
 
   if (!isOpen) return null;
 
@@ -57,7 +58,7 @@ const ChangePhotoModal = ({ isOpen, onClose, user, onPhotoUpdate }) => {
       
       console.log('📤 Subiendo foto de perfil...');
       
-      const response = await fetch('http://localhost:3001/api/auth/profile/photo', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/profile/photo`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -130,7 +131,7 @@ const ChangePhotoModal = ({ isOpen, onClose, user, onPhotoUpdate }) => {
       
       console.log(' Eliminando foto de perfil...');
       
-      const response = await fetch('http://localhost:3001/api/auth/profile/photo', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/profile/photo`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

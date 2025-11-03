@@ -1,6 +1,7 @@
 // HistoryModal.jsx
 import React, { useState, useEffect } from 'react';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL;
 const HistoryModal = ({ isOpen, onClose, userId, token }) => {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -14,7 +15,7 @@ const HistoryModal = ({ isOpen, onClose, userId, token }) => {
   const fetchHistory = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/user-history/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/user-history/${userId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
