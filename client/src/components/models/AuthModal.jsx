@@ -144,8 +144,8 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       setLoading(true);
       setError('');
 
-      console.log('✅ Google response received, token length:', response.credential.length);
-      console.log('📤 Enviando token al backend...');
+      console.log(' Google response received, token length:', response.credential.length);
+      console.log(' Enviando token al backend...');
 
       const backendResponse = await fetch('http://localhost:3001/api/auth/google', {
         method: 'POST',
@@ -155,7 +155,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
         body: JSON.stringify({ token: response.credential }),
       });
 
-      console.log('📥 Respuesta del backend recibida, status:', backendResponse.status);
+      console.log(' Respuesta del backend recibida, status:', backendResponse.status);
 
       if (!backendResponse.ok) {
         // Si no es OK, intentar parsear como JSON primero
