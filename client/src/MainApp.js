@@ -68,6 +68,7 @@ const MainApp = () => {
   const API_BASE_URL = process.env.REACT_APP_API_URL;
 
   // Efecto para detectar tamaño de pantalla
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 1024);
@@ -192,37 +193,37 @@ const MainApp = () => {
   }, []);
 
   // ✅ NUEVA FUNCIÓN: Verificar si un query es una ubicación (coincidencia exacta)
-  const isLocationQuery = useCallback(async (query) => {
-    if (!query.trim()) return false;
+  // const isLocationQuery = useCallback(async (query) => {
+  //   if (!query.trim()) return false;
 
-    try {
-      const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
-        `access_token=${MAPBOX_TOKEN}&types=country,region,place,locality,neighborhood,address&limit=3&language=es`
-      );
+  //   try {
+  //     const response = await fetch(
+  //       `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
+  //       `access_token=${MAPBOX_TOKEN}&types=country,region,place,locality,neighborhood,address&limit=3&language=es`
+  //     );
 
-      if (!response.ok) return false;
+  //     if (!response.ok) return false;
 
-      const data = await response.json();
-      if (!data.features?.length) return false;
+  //     const data = await response.json();
+  //     if (!data.features?.length) return false;
 
-      const normalizedQuery = query.trim().toLowerCase();
-      const exactMatch = data.features.find(f =>
-        f.text?.toLowerCase() === normalizedQuery ||
-        f.place_name?.toLowerCase() === normalizedQuery
-      );
+  //     const normalizedQuery = query.trim().toLowerCase();
+  //     const exactMatch = data.features.find(f =>
+  //       f.text?.toLowerCase() === normalizedQuery ||
+  //       f.place_name?.toLowerCase() === normalizedQuery
+  //     );
 
-      if (exactMatch && isValidLocationType(exactMatch)) {
-        return true;
-      }
+  //     if (exactMatch && isValidLocationType(exactMatch)) {
+  //       return true;
+  //     }
 
-      return false;
+  //     return false;
 
-    } catch (error) {
-      console.warn('Error verificando si es ubicación:', error);
-      return false;
-    }
-  }, [MAPBOX_TOKEN, isValidLocationType]);
+  //   } catch (error) {
+  //     console.warn('Error verificando si es ubicación:', error);
+  //     return false;
+  //   }
+  // }, [MAPBOX_TOKEN, isValidLocationType]);
 
   // Función para verificar si una ubicación es válida
   const isValidMapLocation = useCallback(async (lat, lng) => {
