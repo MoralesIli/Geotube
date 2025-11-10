@@ -75,10 +75,14 @@ const MainApp = () => {
 
   // Efecto para detectar tamaño de pantalla
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
-      if (window.innerWidth >= 1024) {
+      if (typeof window === "undefined") return; // 🚫 protege SSR
+      const width = window.innerWidth || 1024;
+      setIsMobile(width < 1024);
+
+      if (width >= 1024) {
         setShowSidebar(true);
         setShowSearchBar(false);
       } else {
@@ -86,13 +90,18 @@ const MainApp = () => {
       }
     };
 
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
+    // ✅ Ejecutar solo cuando ya existe el objeto window
+    if (typeof window !== "undefined") {
+      checkMobile();
+      window.addEventListener("resize", checkMobile);
+    }
 
     return () => {
-      window.removeEventListener("resize", checkMobile);
+      if (typeof window !== "undefined") {
+        window.removeEventListener("resize", checkMobile);
+      }
     };
-  }, []); // 👈 sin comentario aquí
+  }, []); // ✅ no dependencias
 
   // PAÍSES Y CIUDADES RESTRINGIDAS - LISTA AMPLIADA (usando useMemo)
   const restrictedCountries = useMemo(
