@@ -1,14 +1,3 @@
-import { 
-  restrictedCountries, 
-  restrictedCities, 
-  regionConfig, 
-  categories 
-} from './utils/restrictions';
-import { checkRestrictions, getSidebarTitle  } from './utils/helpers';
-import { MAPBOX_TOKEN, YOUTUBE_API_KEY, API_BASE_URL } from './utils/constants';
-import { useMapboxAPI } from './hooks/useMapboxApi';
-
-
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Map, { Marker, NavigationControl, Popup } from 'react-map-gl/mapbox';
@@ -19,8 +8,6 @@ import ChangePasswordModal from './components/models/ChangePasswordModal';
 import ChangePhotoModal from './components/models/ChangePhotoModal';
 import CommentsModal from './components/models/CommentsModal';
 
-
-
 const MainApp = () => {
   // Estados principales (mantener los mismos estados)
   const [viewport, setViewport] = useState({
@@ -28,12 +15,6 @@ const MainApp = () => {
     longitude: -102.5528,
     zoom: 2,
   });
-  const { 
-  isValidMapLocation, 
-  getLocationCoordinates, 
-  getLocationName, 
-  isValidLocationType 
-} = useMapboxAPI(MAPBOX_TOKEN);
   const [targetViewport, setTargetViewport] = useState(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
@@ -82,9 +63,9 @@ const MainApp = () => {
   const navigate = useNavigate();
 
   // VARIABLES DE ENTORNO
-  // const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
-  // const YOUTUBE_API_KEY = process.env.REACT_APP_YOUTUBE_API_KEY;
-  // const API_BASE_URL = process.env.REACT_APP_API_URL;
+  const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
+  const YOUTUBE_API_KEY = process.env.REACT_APP_YOUTUBE_API_KEY;
+  const API_BASE_URL = process.env.REACT_APP_API_URL;
 
   // Efecto para detectar tamaño de pantalla
   useEffect(() => {
@@ -106,6 +87,271 @@ const MainApp = () => {
     };
   }, []);
 
+  // PAÍSES Y CIUDADES RESTRINGIDAS - LISTA AMPLIADA (usando useMemo)
+  const restrictedCountries = useMemo(() => ['KP', 'IR', 'SY', 'SS', 'CU', 'CN', 'TM', 'UZ', 'TJ', 'ER', 'SD', 'RU', 'BY', 'MM'], []);
+  
+  const restrictedCities = useMemo(() => [
+    'pyongyang', 'corea del norte', 'north korea', 'korea dpr',
+    'teherán', 'tehran', 'iran', 'irán', 
+    'damasco', 'damascus', 'siria', 'syria',
+    'juba', 'sudán del sur', 'south sudan',
+    'la habana', 'havana', 'cuba',
+    'beijing', 'pekín', 'shanghai', 'cantón', 'guangzhou', 'shenzhen', 'china',
+    'ashgabat', 'asjabad', 'turkmenistán', 'turkmenistan',
+    'tashkent', 'taskent', 'uzbekistán', 'uzbekistan',
+    'dushanbe', 'tayikistán', 'tajikistan',
+    'asmara', 'eritrea',
+    'jartum', 'khartoum', 'sudán', 'sudan',
+    'moscú', 'moscow', 'rusia', 'russia',
+    'minsk', 'bielorrusia', 'belarus',
+    'yangon', 'myanmar', 'birmania'
+  ], []);
+
+  // Configuración por región (usando useMemo)
+  const regionConfig = useMemo(() => ({
+    'MX': { 
+      code: 'MX', 
+      name: 'México',
+      center: [23.6345, -102.5528],
+      popularQueries: ['México', 'CDMX', 'Cancún', 'Guadalajara', 'Monterrey']
+    },
+    'US': { 
+      code: 'US', 
+      name: 'Estados Unidos',
+      center: [39.8283, -98.5795],
+      popularQueries: ['USA', 'New York', 'Los Angeles', 'Chicago', 'Miami']
+    },
+    'ES': { 
+      code: 'ES', 
+      name: 'España',
+      center: [40.4637, -3.7492],
+      popularQueries: ['España', 'Madrid', 'Barcelona', 'Valencia', 'Sevilla']
+    },
+    'CN': { 
+      code: 'CN', 
+      name: 'China',
+      center: [35.8617, 104.1954],
+      popularQueries: ['China', 'Beijing', 'Shanghai', 'Guangzhou', 'Shenzhen']
+    },
+    'RU': { 
+      code: 'RU', 
+      name: 'Rusia',
+      center: [61.5240, 105.3188],
+      popularQueries: ['Rusia', 'Moscú', 'San Petersburgo', 'Novosibirsk', 'Ekaterimburgo']
+    }
+  }), []);
+
+  // Categorías de búsqueda (usando useMemo) - MODIFICADO PARA MÓVIL
+  const categories = useMemo(() => [
+    {
+      id: 'cultura',
+      name: 'Cultura',
+      keywords: ['Cultura', 'Tradiciones', 'Costumbres', 'Festividades', 'Arte local'],
+      color: 'from-purple-500 to-pink-500',
+      bgColor: 'bg-gradient-to-r from-purple-500 to-pink-500',
+      icon: '🎭'
+    },
+    {
+      id: 'gastronomia',
+      name: 'Gastronomía',
+      keywords: ['Comida típica', 'Gastronomía', 'Platos regionales', 'Bebidas tradicionales'],
+      color: 'from-orange-500 to-red-500',
+      bgColor: 'bg-gradient-to-r from-orange-500 to-red-500',
+      icon: '🍽️'
+    },
+    {
+      id: 'naturaleza',
+      name: 'Naturaleza',
+      keywords: ['Turismo', 'Lugares turísticos', 'Parques naturales', 'Playas', 'Montañas'],
+      color: 'from-green-500 to-emerald-500',
+      bgColor: 'bg-gradient-to-r from-green-500 to-emerald-500',
+      icon: '🌳'
+    },
+    {
+      id: 'historia',
+      name: 'Historia',
+      keywords: ['Historia del lugar', 'Personajes históricos', 'Museos', 'Patrimonio mundial'],
+      color: 'from-amber-500 to-yellow-500',
+      bgColor: 'bg-gradient-to-r from-amber-500 to-yellow-500',
+      icon: '🏛️'
+    },
+    {
+      id: 'entretenimiento',
+      name: 'Entretenimiento',
+      keywords: ['Eventos culturales', 'Festivales', 'Música moderna', 'Vida nocturna'],
+      color: 'from-blue-500 to-cyan-500',
+      bgColor: 'bg-gradient-to-r from-blue-500 to-cyan-500',
+      icon: '🎪'
+    }
+  ], []);
+
+  // PRIMERO: Definir la función para validar tipo de ubicación AL INICIO
+  const isValidLocationType = useCallback((feature) => {
+    const validTypes = ['country', 'region', 'place', 'locality', 'neighborhood', 'address'];
+    return feature.place_type?.some(type => validTypes.includes(type));
+  }, []);
+
+  // ✅ NUEVA FUNCIÓN: Verificar si un query es una ubicación (coincidencia exacta)
+  const isLocationQuery = useCallback(async (query) => {
+    if (!query.trim()) return false;
+
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
+        `access_token=${MAPBOX_TOKEN}&types=country,region,place,locality,neighborhood,address&limit=3&language=es`
+      );
+
+      if (!response.ok) return false;
+
+      const data = await response.json();
+      if (!data.features?.length) return false;
+
+      const normalizedQuery = query.trim().toLowerCase();
+      const exactMatch = data.features.find(f =>
+        f.text?.toLowerCase() === normalizedQuery ||
+        f.place_name?.toLowerCase() === normalizedQuery
+      );
+
+      if (exactMatch && isValidLocationType(exactMatch)) {
+        return true;
+      }
+
+      return false;
+
+    } catch (error) {
+      console.warn('Error verificando si es ubicación:', error);
+      return false;
+    }
+  }, [MAPBOX_TOKEN, isValidLocationType]);
+
+  // Función para verificar si una ubicación es válida
+  const isValidMapLocation = useCallback(async (lat, lng) => {
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?` +
+        `access_token=${MAPBOX_TOKEN}&` +
+        `types=country,region,place,locality,neighborhood,address&` +
+        `limit=1&` +
+        `language=es`
+      );
+      
+      if (!response.ok) return { isValid: false, placeName: null, featureType: 'unknown' };
+      
+      const data = await response.json();
+      
+      if (data.features && data.features.length > 0) {
+        const feature = data.features[0];
+        const placeName = feature.place_name;
+        const featureType = feature.place_type?.[0] || 'unknown';
+        const countryCode = feature.properties.short_code?.toUpperCase();
+        
+        if (countryCode && restrictedCountries.includes(countryCode)) {
+          return { 
+            isValid: false, 
+            placeName: 'Ubicación en país restringido', 
+            featureType: 'restricted',
+            countryCode 
+          };
+        }
+        
+        const isValid = isValidLocationType(feature);
+        
+        const invalidPatterns = [
+          /unamed road/i,
+          /ocean/i,
+          /sea/i,
+          /pacific ocean/i,
+          /atlantic ocean/i,
+          /indian ocean/i,
+          /arctic ocean/i,
+          /null/i,
+          /undefined/i,
+          /^\s*$/,
+          /mar/i,
+          /gulf/i,
+          /bay/i,
+          /strait/i,
+          /channel/i
+        ];
+        
+        const hasValidName = !invalidPatterns.some(pattern => pattern.test(placeName)) && 
+                            placeName.trim().length > 0;
+        
+        return {
+          isValid: isValid && hasValidName,
+          placeName: isValid && hasValidName ? placeName : null,
+          featureType,
+          countryCode
+        };
+      }
+      
+      return { isValid: false, placeName: null, featureType: 'unknown' };
+    } catch (error) {
+      console.error('Error verificando ubicación:', error);
+      return { isValid: false, placeName: null, featureType: 'unknown' };
+    }
+  }, [MAPBOX_TOKEN, restrictedCountries, isValidLocationType]);
+
+  // Función para obtener coordenadas de ubicación
+  const getLocationCoordinates = useCallback(async (placeName) => {
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(placeName)}.json?` +
+        `access_token=${MAPBOX_TOKEN}&` +
+        `types=country,region,place,locality,neighborhood,address&` +
+        `limit=1&` +
+        `language=es`
+      );
+      
+      if (!response.ok) throw new Error('Error en geocoding');
+      
+      const data = await response.json();
+      
+      if (data.features?.[0]) {
+        const feature = data.features[0];
+        
+        if (!isValidLocationType(feature)) {
+          throw new Error('Tipo de ubicación no válido. Solo se permiten países, ciudades, lugares o direcciones específicas.');
+        }
+
+        const [longitude, latitude] = feature.center;
+        const locationName = feature.place_name;
+        const countryCode = feature.properties.short_code?.toUpperCase();
+        
+        return { latitude, longitude, locationName, countryCode };
+      }
+      
+      throw new Error('Ubicación no encontrada. Verifica el nombre e intenta nuevamente.');
+    } catch (error) {
+      console.warn('Error obteniendo coordenadas:', error);
+      throw error;
+    }
+  }, [MAPBOX_TOKEN, isValidLocationType]);
+
+  const getLocationName = useCallback(async (lat, lng) => {
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?` +
+        `access_token=${MAPBOX_TOKEN}&` +
+        `types=place,locality&` +
+        `limit=1&` +
+        `language=es`
+      );
+      
+      if (!response.ok) throw new Error('Error en geocoding');
+      
+      const data = await response.json();
+      
+      if (data.features?.[0]) {
+        return data.features[0].place_name;
+      }
+      
+      return `Ubicación (${lat.toFixed(2)}, ${lng.toFixed(2)})`;
+    } catch (error) {
+      console.warn('Error obteniendo nombre de ubicación:', error);
+      return `Ubicación actual`;
+    }
+  }, [MAPBOX_TOKEN]);
 
   // FUNCIÓN CORREGIDA: Buscar videos subidos en una ubicación específica
   const searchYouTubeVideosByLocation = useCallback(async (latitude, longitude, locationName, query = '', pageToken = '') => {
@@ -395,6 +641,51 @@ const MainApp = () => {
       console.error('Error moviendo el mapa a la ubicación:', error);
     }
   }, [getLocationCoordinates]);
+
+  // FUNCIÓN MEJORADA PARA VERIFICAR RESTRICCIONES
+  const checkRestrictions = useCallback((query, locationData = null) => {
+    console.log('Verificando restricciones para:', query, locationData);
+    
+    const restrictedPatterns = new RegExp(
+      restrictedCities.map(city => city.toLowerCase()).join('|'), 
+      'i'
+    );
+    
+    if (restrictedPatterns.test(query.toLowerCase())) {
+      console.log('Query restringido detectado:', query);
+      return {
+        restricted: true,
+        reason: 'query',
+        message: 'Videos no disponibles en esta región (restricción de YouTube).'
+      };
+    }
+
+    if (locationData && locationData.countryCode) {
+      const countryCode = locationData.countryCode.toUpperCase();
+      if (restrictedCountries.includes(countryCode)) {
+        console.log('País restringido detectado:', countryCode);
+        return {
+          restricted: true,
+          reason: 'country',
+          message: 'YouTube no está disponible en este país (restricción gubernamental).'
+        };
+      }
+    }
+
+    if (locationData && locationData.locationName) {
+      if (restrictedPatterns.test(locationData.locationName.toLowerCase())) {
+        console.log('Ubicación restringida detectada:', locationData.locationName);
+        return {
+          restricted: true,
+          reason: 'location',
+          message: 'Videos no disponibles en esta ubicación (restricción de YouTube).'
+        };
+      }
+    }
+
+    console.log('Ubicación permitida');
+    return { restricted: false };
+  }, [restrictedCities, restrictedCountries]);
 
   // Función para obtener sugerencias
   const fetchSuggestions = useCallback(async (query) => {
@@ -1435,24 +1726,24 @@ const MainApp = () => {
   }, [user, selectedVideo, registerVideoAccess, clickedLocation, isValidLocation, clickedLocationName, searchLocation, navigate]);
 
   // Helper functions
-  // const getSidebarTitle = useCallback(() => {
-  //   if (!youtubeAvailable) {
-  //     return 'YouTube No Disponible';
-  //   }
+  const getSidebarTitle = useCallback(() => {
+    if (!youtubeAvailable) {
+      return 'YouTube No Disponible';
+    }
     
-  //   const titles = {
-  //     popular: 'Videos Populares',
-  //     other: 'Videos Cercanos', 
-  //     current: 'Videos en tu Ubicación',
-  //     search: activeSearchTerm ? `Videos de "${activeSearchTerm}"` : `Videos de "${searchTerm}"`,
-  //     mexico: 'Videos Populares de México',
-  //     clicked: `Videos en ${clickedLocationName}`,
-  //     category: selectedCategory ? `Videos de ${selectedCategory.name}` : 'Videos por Categoría',
-  //     unavailable: 'Servicio No Disponible',
-  //     'no-videos': 'No Hay Videos'
-  //   };
-  //   return titles[activeFilter] || 'Videos con Vista Previa';
-  // }, [youtubeAvailable, activeFilter, activeSearchTerm, searchTerm, clickedLocationName, selectedCategory]);
+    const titles = {
+      popular: 'Videos Populares',
+      other: 'Videos Cercanos', 
+      current: 'Videos en tu Ubicación',
+      search: activeSearchTerm ? `Videos de "${activeSearchTerm}"` : `Videos de "${searchTerm}"`,
+      mexico: 'Videos Populares de México',
+      clicked: `Videos en ${clickedLocationName}`,
+      category: selectedCategory ? `Videos de ${selectedCategory.name}` : 'Videos por Categoría',
+      unavailable: 'Servicio No Disponible',
+      'no-videos': 'No Hay Videos'
+    };
+    return titles[activeFilter] || 'Videos con Vista Previa';
+  }, [youtubeAvailable, activeFilter, activeSearchTerm, searchTerm, clickedLocationName, selectedCategory]);
 
   const getSidebarSubtitle = useCallback(() => {
     if (!youtubeAvailable) {
