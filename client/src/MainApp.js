@@ -76,32 +76,39 @@ const MainApp = () => {
   // Efecto para detectar tamaño de pantalla
   // eslint-disable-next-line react-hooks/exhaustive-deps
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    const checkMobile = () => {
-      if (typeof window === "undefined") return; // 🚫 protege SSR
-      const width = window.innerWidth || 1024;
-      setIsMobile(width < 1024);
+useEffect(() => {
+  const checkMobile = () => {
+    if (typeof window === "undefined") return; // 🚫 protege SSR
+    const width = window.innerWidth || 1024;
+    const isMobileDetected = width < 1024;
 
-      if (width >= 1024) {
-        setShowSidebar(true);
-        setShowSearchBar(false);
-      } else {
-        setShowSidebar(false);
-      }
-    };
+    // imprime información útil
+    console.log(
+      `[GeoTube] Ancho actual: ${width}px | isMobile = ${isMobileDetected}`
+    );
 
-    // ✅ Ejecutar solo cuando ya existe el objeto window
-    if (typeof window !== "undefined") {
-      checkMobile();
-      window.addEventListener("resize", checkMobile);
+    setIsMobile(isMobileDetected);
+
+    if (width >= 1024) {
+      setShowSidebar(true);
+      setShowSearchBar(false);
+    } else {
+      setShowSidebar(false);
     }
+  };
 
-    return () => {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("resize", checkMobile);
-      }
-    };
-  }, []); // ✅ no dependencias
+  if (typeof window !== "undefined") {
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+  }
+
+  return () => {
+    if (typeof window !== "undefined") {
+      window.removeEventListener("resize", checkMobile);
+    }
+  };
+}, []); // sin dependencias
+
 
   // PAÍSES Y CIUDADES RESTRINGIDAS - LISTA AMPLIADA (usando useMemo)
   const restrictedCountries = useMemo(
