@@ -11,8 +11,7 @@ import React, {
   useState,
   useEffect,
   useRef,
-  useCallback,
-  useMemo,
+  useCallback
 } from "react";
 import { useNavigate } from "react-router-dom";
 import Map, { Marker, NavigationControl, Popup } from "react-map-gl/mapbox";
@@ -92,6 +91,7 @@ const MainApp = () => {
   // const API_BASE_URL = process.env.REACT_APP_API_URL;
 
   // Efecto para detectar tamaño de pantalla
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 1024);
@@ -544,7 +544,7 @@ const MainApp = () => {
       console.warn("Error en detección de región:", error);
     }
     return "MX";
-  }, [MAPBOX_TOKEN, restrictedCountries, regionConfig]);
+  }, [MAPBOX_TOKEN, regionConfig]);
 
   // Función para verificar disponibilidad de YouTube
   const checkYouTubeAvailability = useCallback(async () => {
