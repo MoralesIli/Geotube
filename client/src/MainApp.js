@@ -86,6 +86,7 @@ const MainApp = () => {
     return () => {
       window.removeEventListener('resize', checkMobile);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // PAÍSES Y CIUDADES RESTRINGIDAS - LISTA AMPLIADA (usando useMemo)
