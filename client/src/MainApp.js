@@ -1737,15 +1737,15 @@ const MainApp = () => {
         user={user}
       />
 
-      {/* Contenido Principal - ESTRUCTURA CORREGIDA PARA MÓVIL */}
+      {/* Contenido Principal - ESTRUCTURA MEJORADA PARA MÓVIL */}
       <div className={`flex flex-1 ${
         isMobile ? 'flex-col pt-16' : 'flex-row pt-20'
       }`}>
         
-        {/* Mapa - CORREGIDO: Z-INDEX Y POSICIONAMIENTO MEJORADO */}
+        {/* Mapa - POSICIÓN MEJORADA DE BOTONES */}
         <div className={`relative ${
           isMobile 
-            ? showSidebar ? 'h-1/2' : 'h-full' 
+            ? showSidebar ? 'h-3/5' : 'h-full'
             : 'flex-1'
         }`}>
           <Map
@@ -1758,6 +1758,7 @@ const MainApp = () => {
           >
             <NavigationControl position="top-right" />
 
+            {/* POPUP CORREGIDO - POSICIÓN MEJORADA */}
             {showLocationPopup && clickedLocation && (
               <Popup
                 latitude={clickedLocation.latitude}
@@ -1765,13 +1766,13 @@ const MainApp = () => {
                 closeButton={false}
                 closeOnClick={false}
                 onClose={() => setShowLocationPopup(false)}
-                anchor="top"
-                className={`rounded-xl shadow-2xl border border-gray-300 bg-white/95 backdrop-blur-md ${
-                  isMobile ? 'max-w-[90vw]' : ''
+                anchor="bottom"
+                className={`rounded-xl shadow-xl border border-gray-300 bg-white/95 backdrop-blur-md ${
+                  isMobile ? 'max-w-[92vw] translate-y-[-10px]' : 'w-[320px]'
                 }`}
               >
                 <div className={`text-center text-gray-800 ${
-                  isMobile ? 'p-3 w-auto' : 'p-4 w-65'
+                  isMobile ? 'p-3 w-auto' : 'p-4'
                 }`}>
                   <h3 className={`font-semibold leading-snug ${
                     isMobile ? 'text-base mb-1' : 'text-lg mb-2'
@@ -1869,23 +1870,22 @@ const MainApp = () => {
             ))}
           </Map>
 
-          {/* BOTONES DE CONTROL DEL MAPA - CORREGIDOS: Z-INDEX ALTO Y VISIBILIDAD GARANTIZADA */}
+          {/* BOTONES DE CONTROL DEL MAPA - POSICIÓN CORREGIDA SEGÚN TU SOLUCIÓN */}
           <div className={`absolute ${
             isMobile 
-              ? 'bottom-4 right-4 left-4 flex justify-between z-40' 
-              : 'bottom-6 right-6 z-40'
+              ? 'bottom-20 left-0 right-0 flex justify-center gap-3 z-50 px-4'
+              : 'bottom-8 right-8 flex flex-col gap-3 z-50'
           }`}>
             
-            {/* Botón Mi Ubicación - SIEMPRE VISIBLE */}
+            {/* Botón Mi Ubicación - MEJORADO */}
             <button
               onClick={getUserLocation}
               disabled={isAnimating}
-              className={`bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold rounded-2xl shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center ${
+              className={`bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold rounded-xl shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center ${
                 isMobile 
                   ? 'px-4 py-3 text-sm gap-2' 
                   : 'px-6 py-3 text-lg gap-2'
               }`}
-              style={{ zIndex: 1000 }}
             >
               {isAnimating ? (
                 <>
@@ -1898,22 +1898,21 @@ const MainApp = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  {!isMobile && 'Mi Ubicación'}
+                  {isMobile ? 'Mi Ubicación' : 'Mi Ubicación'}
                 </>
               )}
             </button>
 
-            {/* Botón para mostrar/ocultar sidebar en móvil - SIEMPRE VISIBLE */}
+            {/* Botón para mostrar/ocultar sidebar en móvil - MEJORADO */}
             {isMobile && (
               <button
                 onClick={() => setShowSidebar(!showSidebar)}
-                className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-bold px-4 py-3 rounded-2xl shadow-2xl transition-all duration-300 flex items-center gap-2 text-sm"
-                style={{ zIndex: 1000 }}
+                className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-bold px-4 py-3 rounded-xl shadow-2xl transition-all duration-300 flex items-center gap-2 text-sm"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showSidebar ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
                 </svg>
-                {showSidebar ? 'Ocultar' : 'Videos'}
+                {showSidebar ? 'Ocultar Videos' : 'Mostrar Videos'}
               </button>
             )}
           </div>
@@ -1928,34 +1927,34 @@ const MainApp = () => {
           )}
         </div>
 
-        {/* Sidebar - MEJORADO PARA MÓVIL */}
+        {/* Sidebar - TAMAÑO MEJORADO PARA MÓVIL */}
         {showSidebar && (
           <div className={`bg-gradient-to-b from-slate-900 via-purple-900 to-blue-900 overflow-y-auto flex flex-col ${
             isMobile 
-              ? 'h-1/2 border-t border-gray-700 z-30' 
+              ? 'h-2/5 border-t border-gray-700 z-30'
               : 'w-1/3 p-6'
           }`}>
             
-            {/* Encabezado del sidebar */}
+            {/* Encabezado del sidebar - COMPACTO */}
             <div className={`text-center ${
-              isMobile ? 'p-4 border-b border-gray-700' : 'mb-6'
+              isMobile ? 'p-3 border-b border-gray-700 bg-gray-800/50' : 'mb-6'
             }`}>
               <h2 className={`font-bold bg-gradient-to-r from-yellow-400 via-red-400 to-pink-400 bg-clip-text text-transparent ${
-                isMobile ? 'text-xl' : 'text-3xl'
+                isMobile ? 'text-lg' : 'text-3xl'
               }`}>
                 {getSidebarTitle()}
               </h2>
               <p className={`text-cyan-300 ${
-                isMobile ? 'text-xs mt-1' : 'text-sm mt-2'
+                isMobile ? 'text-xs mt-1 truncate px-2' : 'text-sm mt-2'
               }`}>
                 {getSidebarSubtitle()}
               </p>
             </div>
 
-            {/* Categorías en móvil */}
+            {/* Categorías en móvil - MÁS COMPACTO */}
             {isMobile && (
-              <div className="px-4 py-3 border-b border-gray-700">
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+              <div className="px-3 py-2 border-b border-gray-700 bg-gray-800/30">
+                <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
                   {categories.map((category) => {
                     const hasValidLocation = (clickedLocation && isValidLocation) || userLocation;
                     
@@ -1964,14 +1963,14 @@ const MainApp = () => {
                         key={category.id}
                         onClick={() => searchVideosByCategory(category)}
                         disabled={!hasValidLocation}
-                        className={`flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-white transition-all duration-200 transform hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium flex-shrink-0 ${
+                        className={`flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-white transition-all duration-200 transform hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium flex-shrink-0 ${
                           selectedCategory?.id === category.id 
                             ? `ring-1 ring-white ${category.bgColor}`
                             : `bg-gradient-to-r ${category.color} hover:shadow-md`
                         }`}
                       >
                         <span className="text-xs">{category.icon}</span>
-                        <span>{category.name}</span>
+                        <span className="text-xs">{category.name}</span>
                       </button>
                     );
                   })}
@@ -1980,54 +1979,54 @@ const MainApp = () => {
             )}
 
             {!youtubeAvailable ? (
-              <div className="flex-1 flex items-center justify-center">
+              <div className="flex-1 flex items-center justify-center p-4">
                 <div className="text-center">
-                  <div className="w-16 h-16 sm:w-24 sm:h-24 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
-                    <svg className="w-8 h-8 sm:w-12 sm:h-12 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-12 h-12 sm:w-24 sm:h-24 mx-auto mb-3 rounded-full bg-red-500/10 flex items-center justify-center">
+                    <svg className="w-6 h-6 sm:w-12 sm:h-12 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
                     </svg>
                   </div>
-                  <h3 className="text-lg sm:text-xl font-semibold text-red-300 mb-2">YouTube No Disponible</h3>
-                  <p className="text-gray-400 mb-4 text-sm">
+                  <h3 className="text-base sm:text-xl font-semibold text-red-300 mb-2">YouTube No Disponible</h3>
+                  <p className="text-gray-400 mb-4 text-xs sm:text-sm">
                     {youtubeError || 'YouTube no está disponible en tu país o región.'}
                   </p>
                 </div>
               </div>
             ) : (
               <>
-                {/* Botones de acción - MEJORADOS PARA MÓVIL */}
-                <div className={`grid gap-3 ${
-                  isMobile ? 'p-4 grid-cols-2' : 'mb-6 grid-cols-2'
+                {/* Botones de acción - MÁS COMPACTOS EN MÓVIL */}
+                <div className={`grid gap-2 ${
+                  isMobile ? 'p-3 grid-cols-2' : 'mb-6 grid-cols-2 gap-3'
                 }`}>
                   <button
                     onClick={fetchOtherVideos}
                     disabled={(!userLocation && !clickedLocation) || loadingVideos}
-                    className={`font-bold rounded-2xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg ${
+                    className={`font-bold rounded-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg ${
                       activeFilter === 'other' 
                         ? 'bg-cyan-600 border-2 border-cyan-400' 
                         : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600'
-                    } ${isMobile ? 'py-2 px-3 text-sm' : 'py-3 px-4'}`}
+                    } ${isMobile ? 'py-2 px-2 text-xs' : 'py-3 px-4 text-sm'}`}
                   >
                     {loadingVideos && activeFilter === 'other' ? 'Cargando...' : 'Videos Cercanos'}
                   </button>
                   <button
                     onClick={fetchPopularVideos}
                     disabled={(!userLocation && !clickedLocation) || loadingVideos}
-                    className={`font-bold rounded-2xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg ${
+                    className={`font-bold rounded-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg ${
                       activeFilter === 'popular' 
                         ? 'bg-orange-600 border-2 border-orange-400' 
                         : 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600'
-                    } ${isMobile ? 'py-2 px-3 text-sm' : 'py-3 px-4'}`}
+                    } ${isMobile ? 'py-2 px-2 text-xs' : 'py-3 px-4 text-sm'}`}
                   >
                     {loadingVideos && activeFilter === 'popular' ? 'Cargando...' : 'Populares'}
                   </button>
                 </div>
 
                 {loadingVideos && (
-                  <div className={`glass-effect bg-gray-800/50 rounded-2xl text-center ${
-                    isMobile ? 'mx-4 p-3 mb-4' : 'p-4 mb-6'
+                  <div className={`glass-effect bg-gray-800/50 rounded-xl text-center ${
+                    isMobile ? 'mx-3 p-2 mb-3' : 'p-4 mb-6'
                   }`}>
-                    <p className="text-cyan-400 flex items-center justify-center gap-2 text-sm">
+                    <p className="text-cyan-400 flex items-center justify-center gap-2 text-xs sm:text-sm">
                       <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-cyan-400"></span>
                       {activeFilter === 'search' ? 'Buscando videos...' : 'Cargando videos...'}
                     </p>
@@ -2035,41 +2034,41 @@ const MainApp = () => {
                 )}
 
                 {selectedVideo && (
-                  <div className={`glass-effect bg-gray-800/50 rounded-2xl border-2 border-cyan-500/50 ${
-                    isMobile ? 'mx-4 p-3 mb-4' : 'p-4 mb-6'
+                  <div className={`glass-effect bg-gray-800/50 rounded-xl border-2 border-cyan-500/50 ${
+                    isMobile ? 'mx-3 p-2 mb-3' : 'p-4 mb-6'
                   }`}>
-                    <div className="text-center mb-3">
+                    <div className="text-center mb-2">
                       <h3 className={`font-bold text-cyan-300 ${
-                        isMobile ? 'text-base' : 'text-lg'
+                        isMobile ? 'text-sm' : 'text-lg'
                       }`}>
-                        Vista Previa: {selectedVideo.channelTitle}
+                        Vista Previa
                       </h3>
-                      <p className={`text-gray-300 mt-1 line-clamp-2 ${
+                      <p className={`text-gray-300 mt-1 line-clamp-1 ${
                         isMobile ? 'text-xs' : 'text-sm'
-                      }`}>{selectedVideo.title}</p>
+                      }`}>{selectedVideo.channelTitle}</p>
                     </div>
-                    <div className="bg-black rounded-lg overflow-hidden mb-3">
+                    <div className="bg-black rounded-lg overflow-hidden mb-2">
                       <YouTube
                         videoId={selectedVideo.youtube_video_id}
                         opts={{ 
                           width: '100%', 
-                          height: isMobile ? '150' : '200',
+                          height: isMobile ? '120' : '200',
                           playerVars: { autoplay: 0, modestbranding: 1, rel: 0 }
                         }}
                       />
                     </div>
-                    <div className={`grid gap-2 ${
+                    <div className={`grid gap-1 ${
                       isMobile ? 'grid-cols-2' : 'grid-cols-2 gap-3'
                     }`}>
                       <button 
                         onClick={() => setSelectedVideo(null)}
-                        className="bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-3 rounded-lg transition-all duration-300 text-sm"
+                        className="bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-2 rounded-lg transition-all duration-300 text-xs sm:text-sm"
                       >
                         Cerrar
                       </button>
                       <button 
                         onClick={handleWatchComplete}
-                        className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-semibold py-2 px-3 rounded-lg transition-all duration-300 transform hover:scale-105 text-sm"
+                        className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-semibold py-2 px-2 rounded-lg transition-all duration-300 transform hover:scale-105 text-xs sm:text-sm"
                       >
                         Ver Completo
                       </button>
@@ -2077,9 +2076,9 @@ const MainApp = () => {
                   </div>
                 )}
 
-                {/* Lista de videos */}
-                <div className={`space-y-3 flex-1 overflow-y-auto ${
-                  isMobile ? 'px-4 pb-4' : 'space-y-4'
+                {/* Lista de videos - MÁS COMPACTA */}
+                <div className={`space-y-2 flex-1 overflow-y-auto ${
+                  isMobile ? 'px-3 pb-3' : 'space-y-4'
                 }`}>
                   {videos.length > 0 ? (
                     <>
@@ -2088,23 +2087,23 @@ const MainApp = () => {
                           key={video.youtube_video_id}
                           onClick={() => handleVideoClick(video)}
                           onDoubleClick={() => handleVideoDoubleClick(video)}
-                          className={`glass-effect bg-gray-800/50 rounded-2xl cursor-pointer transform hover:scale-102 transition-all duration-300 border-l-4 ${
+                          className={`glass-effect bg-gray-800/50 rounded-xl cursor-pointer transform hover:scale-102 transition-all duration-300 border-l-4 ${
                             video.isSearchResult 
                               ? 'border-l-yellow-500 bg-yellow-500/10' 
                               : video.isCurrentLocation 
                                 ? 'border-l-green-500 bg-green-500/10' 
                                 : 'border-l-cyan-500 bg-cyan-500/10'
                           } ${selectedVideo?.youtube_video_id === video.youtube_video_id ? 'ring-2 ring-yellow-400' : ''} ${
-                            isMobile ? 'p-3' : 'p-4'
+                            isMobile ? 'p-2' : 'p-4'
                           }`}
                         >
-                          <div className="flex gap-3">
+                          <div className="flex gap-2">
                             <div className="flex-shrink-0">
                               <img 
                                 src={`https://img.youtube.com/vi/${video.youtube_video_id}/mqdefault.jpg`}
                                 alt="Miniatura del video"
                                 className={`rounded-lg object-cover ${
-                                  isMobile ? 'w-16 h-12' : 'w-20 h-15'
+                                  isMobile ? 'w-12 h-9' : 'w-20 h-15'
                                 }`}
                                 onError={(e) => {
                                   e.target.src = 'https://via.placeholder.com/120x90/1f2937/6b7280?text=Video';
@@ -2112,7 +2111,7 @@ const MainApp = () => {
                               />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
+                              <div className="flex items-center gap-1 mb-1">
                                 <div className={`rounded-full ${
                                   video.isSearchResult 
                                     ? 'bg-gradient-to-r from-yellow-500 to-orange-500' 
@@ -2122,7 +2121,7 @@ const MainApp = () => {
                                   isMobile ? 'text-xs' : 'text-sm'
                                 } truncate`}>{video.channelTitle}</p>
                               </div>
-                              <p className={`text-gray-300 line-clamp-2 mb-1 ${
+                              <p className={`text-gray-300 line-clamp-1 mb-1 ${
                                 isMobile ? 'text-xs' : 'text-xs'
                               }`}>{video.title}</p>
                               <div className="flex justify-between items-center">
@@ -2135,9 +2134,6 @@ const MainApp = () => {
                                   }`}>{formatDuration(video.duration)}</span>
                                 )}
                               </div>
-                              <p className={`text-cyan-400 mt-1 ${
-                                isMobile ? 'text-xs' : 'text-xs'
-                              } truncate`}>{video.location_name}</p>
                             </div>
                           </div>
                         </div>
@@ -2145,8 +2141,8 @@ const MainApp = () => {
                     </>
                   ) : (
                     !loadingVideos && (
-                      <div className="text-center py-6">
-                        <p className="text-gray-400 text-sm">No se encontraron videos</p>
+                      <div className="text-center py-4">
+                        <p className="text-gray-400 text-xs sm:text-sm">No se encontraron videos</p>
                         <p className="text-gray-500 text-xs mt-1">
                           {userLocation || clickedLocation ? 'Usa los botones para cargar videos' : 'Activa tu ubicación o usa la búsqueda'}
                         </p>
