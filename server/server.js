@@ -19,7 +19,7 @@ console.log('JWT_SECRET:', process.env.JWT_SECRET ? 'Definido' : 'No definido');
 console.log('GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? 'Definido' : 'No definido');
 console.log('YOUTUBE_API_KEY:', process.env.YOUTUBE_API_KEY ? 'Definido' : 'No definido');
 console.log('MAPBOX_TOKEN:', process.env.MAPBOX_TOKEN ? 'Definido' : 'No definido');
-console.log('New Relic app name:', require('newrelic').getAppName());
+// console.log('New Relic app name:', require('newrelic').getAppName());
 
 
 // Configuración de la conexión a MySQL
