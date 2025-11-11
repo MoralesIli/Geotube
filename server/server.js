@@ -1,3 +1,4 @@
+require('newrelic'); // ← debe ser la primera línea
 require('dotenv').config();
 
 const express = require('express');
