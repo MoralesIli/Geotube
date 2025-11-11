@@ -74,37 +74,41 @@ const MainApp = () => {
   const API_BASE_URL = process.env.REACT_APP_API_URL;
 
   // Efecto para detectar tamaño de pantalla
-  useEffect(() => {
-    const checkMobile = () => {
-      if (typeof window === "undefined") return;
-      const width = window.innerWidth || 1024;
-      const isMobileDetected = width < 1024;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+useEffect(() => {
+  const checkMobile = () => {
+    if (typeof window === "undefined") return; 
+    const width = window.innerWidth || 1024;
+    const isMobileDetected = width < 1024;
 
-      console.log(
-        `[GeoTube] Ancho actual: ${width}px | isMobile = ${isMobileDetected}`
-      );
+    // imprime información útil
+    console.log(
+      `[GeoTube] Ancho actual: ${width}px | isMobile = ${isMobileDetected}`
+    );
 
-      setIsMobile(isMobileDetected);
+    setIsMobile(isMobileDetected);
 
-      if (width >= 1024) {
-        setShowSidebar(true);
-        setShowSearchBar(false);
-      } else {
-        setShowSidebar(false);
-      }
-    };
-
-    if (typeof window !== "undefined") {
-      checkMobile();
-      window.addEventListener("resize", checkMobile);
+    if (width >= 1024) {
+      setShowSidebar(true);
+      setShowSearchBar(false);
+    } else {
+      setShowSidebar(false);
     }
+  };
 
-    return () => {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("resize", checkMobile);
-      }
-    };
-  }, []);
+  if (typeof window !== "undefined") {
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+  }
+
+  return () => {
+    if (typeof window !== "undefined") {
+      window.removeEventListener("resize", checkMobile);
+    }
+  };
+}, []); // sin dependencias
+
 
   // PAÍSES Y CIUDADES RESTRINGIDAS - LISTA AMPLIADA (usando useMemo)
   const restrictedCountries = useMemo(
@@ -332,6 +336,39 @@ const MainApp = () => {
     ];
     return feature.place_type?.some((type) => validTypes.includes(type));
   }, []);
+
+  // ✅ NUEVA FUNCIÓN: Verificar si un query es una ubicación (coincidencia exacta)
+  // const isLocationQuery = useCallback(async (query) => {
+  //   if (!query.trim()) return false;
+
+  //   try {
+  //     const response = await fetch(
+  //       `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
+  //       `access_token=${MAPBOX_TOKEN}&types=country,region,place,locality,neighborhood,address&limit=3&language=es`
+  //     );
+
+  //     if (!response.ok) return false;
+
+  //     const data = await response.json();
+  //     if (!data.features?.length) return false;
+
+  //     const normalizedQuery = query.trim().toLowerCase();
+  //     const exactMatch = data.features.find(f =>
+  //       f.text?.toLowerCase() === normalizedQuery ||
+  //       f.place_name?.toLowerCase() === normalizedQuery
+  //     );
+
+  //     if (exactMatch && isValidLocationType(exactMatch)) {
+  //       return true;
+  //     }
+
+  //     return false;
+
+  //   } catch (error) {
+  //     console.warn('Error verificando si es ubicación:', error);
+  //     return false;
+  //   }
+  // }, [MAPBOX_TOKEN, isValidLocationType]);
 
   // Función para verificar si una ubicación es válida
   const isValidMapLocation = useCallback(
@@ -3008,15 +3045,6 @@ const MainApp = () => {
             mapboxAccessToken={MAPBOX_TOKEN}
             mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
           >
-            {/* ESTILO PARA OCULTAR LA ATRIBUCIÓN DE MAPBOX */}
-            <style>
-              {`
-                .mapboxgl-ctrl-attrib {
-                  display: none !important;
-                }
-              `}
-            </style>
-
             <NavigationControl position="top-right" />
 
             {showLocationPopup && clickedLocation && (
