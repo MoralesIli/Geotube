@@ -101,7 +101,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       console.log(' Iniciando autenticación Google con popup...');
       
       window.google.accounts.id.initialize({
-        client_id: '369281279205-mj2fc1oeoe56884ubitisfh51bm09us8.apps.googleusercontent.com',
+        client_id: '64896853965-i3j6cddp5can0ir6evl5ope0gv3jvou4.apps.googleusercontent.com',
         callback: handleGoogleResponse,
         ux_mode: 'popup',
         auto_select: false,
