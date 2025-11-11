@@ -78,7 +78,7 @@ const MainApp = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
 useEffect(() => {
   const checkMobile = () => {
-    if (typeof window === "undefined") return; // 🚫 protege SSR
+    if (typeof window === "undefined") return; 
     const width = window.innerWidth || 1024;
     const isMobileDetected = width < 1024;
 
