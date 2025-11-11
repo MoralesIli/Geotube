@@ -4,7 +4,7 @@ exports.config = {
   app_name: ['MiApp-Backend'], // nombre que verás en New Relic
   license_key: process.env.NEW_RELIC_LICENSE_KEY,
   logging: {
-    level: 'info', // puede ser 'trace' si quieres más detalle
+    level: 'trace', // puede ser 'trace' si quieres más detalle
   },
   allow_all_headers: true,
   attributes: {
