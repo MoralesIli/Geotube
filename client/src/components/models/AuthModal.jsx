@@ -23,6 +23,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const API_BASE_URL = process.env.REACT_APP_API_URL;
 
   const passwordRules = {
     length: (pwd) => pwd.length >= 8,
@@ -99,9 +100,9 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
 
     try {
       console.log(' Iniciando autenticación Google con popup...');
-      
+
       window.google.accounts.id.initialize({
-        client_id: '369281279205-mj2fc1oeoe56884ubitisfh51bm09us8.apps.googleusercontent.com',
+        client_id: '64896853965-i3j6cddp5can0ir6evl5ope0gv3jvou4.apps.googleusercontent.com',
         callback: handleGoogleResponse,
         ux_mode: 'popup',
         auto_select: false,
@@ -147,7 +148,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       console.log(' Google response received, token length:', response.credential.length);
       console.log(' Enviando token al backend...');
 
-      const backendResponse = await fetch('http://localhost:3001/api/auth/google', {
+      const backendResponse = await fetch(`${API_BASE_URL}/api/auth/google`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -155,7 +156,12 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
         body: JSON.stringify({ token: response.credential }),
       });
 
+<<<<<<< HEAD
       console.log(' Respuesta del backend recibida, status:', backendResponse.status);
+=======
+
+      console.log('📥 Respuesta del backend recibida, status:', backendResponse.status);
+>>>>>>> d3058248a33d9268330573cba182184c105d7b5d
 
       if (!backendResponse.ok) {
         // Si no es OK, intentar parsear como JSON primero
@@ -171,18 +177,18 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       const data = await backendResponse.json();
 
       console.log(' Login exitoso con Google:', data.user);
-      
+
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
-      
+
       onLogin(data.user);
       onClose();
 
     } catch (err) {
       console.error(' Google auth error:', err);
-      
+
       if (err.message.includes('Failed to fetch')) {
-        setError('No se pudo conectar al servidor. Verifica que esté corriendo en localhost:3001');
+        setError(`No se pudo conectar al servidor. Verifica que esté corriendo en ${API_BASE_URL}`);
       } else if (err.message.includes('404') || err.message.includes('Cannot POST')) {
         setError('Error: La ruta /api/auth/google no existe en el servidor. Verifica el backend.');
       } else {
@@ -235,7 +241,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
 
       console.log(' Enviando datos a:', endpoint, payload);
 
-      const response = await fetch(`http://localhost:3001/api/auth${endpoint}`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -256,10 +262,10 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
       const data = await response.json();
 
       console.log(' Login/Register exitoso:', data.user);
-      
+
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
-      
+
       onLogin(data.user);
       onClose();
 
@@ -328,7 +334,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
             </svg>
             {loading ? 'Cargando...' : 'Continuar con Google'}
           </button>
-          
+
           {!googleLoaded && (
             <p className="text-xs text-yellow-500 mt-2 text-center">
               Cargando Google Auth...

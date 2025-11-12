@@ -1,3 +1,4 @@
+require('newrelic'); // ← debe ser la primera línea
 require('dotenv').config();
 
 const express = require('express');
@@ -10,6 +11,7 @@ const { OAuth2Client } = require('google-auth-library');
 
 const app = express();
 const port = process.env.PORT || 3001;
+const host = process.env.HOST || 'localhost';
 
 // Verificar variables críticas al inicio
 console.log('Verificando variables de entorno:');
@@ -17,29 +19,43 @@ console.log('JWT_SECRET:', process.env.JWT_SECRET ? 'Definido' : 'No definido');
 console.log('GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? 'Definido' : 'No definido');
 console.log('YOUTUBE_API_KEY:', process.env.YOUTUBE_API_KEY ? 'Definido' : 'No definido');
 console.log('MAPBOX_TOKEN:', process.env.MAPBOX_TOKEN ? 'Definido' : 'No definido');
+// console.log('New Relic app name:', require('newrelic').getAppName());
+
 
 // Configuración de la conexión a MySQL
-const db = mysql.createConnection({
+const db = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '12345',
   database: process.env.DB_NAME || 'geotube_db',
+  port: parseInt(process.env.DB_PORT),
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
 });
 
 // Conectar a la base de datos
-db.connect((err) => {
-  if (err) {
-    console.error('Error connecting to MySQL:', err.stack);
-    return;
-  }
-  console.log('Connected to MySQL as id ' + db.threadId);
-});
+// db.connect((err) => {
+//   if (err) {
+//     console.error('Error connecting to MySQL:', err.stack);
+//     return;
+//   }
+//   console.log('Connected to MySQL as id ' + db.threadId);
+// });
+
+const allowedOrigins = [
+  'https://geotube-one.vercel.app', // tu frontend en producción
+  'http://localhost:3000'                // útil para desarrollo local
+];
+
+
 
 // Middleware para habilitar CORS y JSON
 app.use(cors({
-  origin: 'http://localhost:3000',
-  credentials: true
+  origin: allowedOrigins,
+  credentials: true, // si usas cookies o headers personalizados
 }));
+
 app.use(express.json({ limit: '10mb' }));
 
 // API Keys
@@ -973,13 +989,13 @@ app.use((error, req, res, next) => {
 
 // Iniciar el servidor
 app.listen(port, () => {
-  console.log(`Servidor corriendo en http://localhost:${port}`);
-  console.log(`API disponible en http://localhost:${port}/api`);
-  console.log(`Ruta Comentarios Proyecto: GET/POST http://localhost:${port}/api/comentarios-proyecto`);
-  console.log(`Ruta Google Auth: POST http://localhost:${port}/api/auth/google`);
-  console.log(`Ruta Perfil: GET/PUT http://localhost:${port}/api/auth/profile`);
-  console.log(`Ruta Foto Perfil: PUT http://localhost:${port}/api/auth/profile/photo`);
-  console.log(`Ruta Cambiar Contraseña: POST http://localhost:${port}/api/auth/change-password`);
+  console.log(`Servidor corriendo en http://${host}:${port}`);
+  console.log(`API disponible en http://${host}:${port}/api`);
+  console.log(`Ruta Comentarios Proyecto: GET/POST http://${host}:${port}/api/comentarios-proyecto`);
+  console.log(`Ruta Google Auth: POST http://${host}:${port}/api/auth/google`);
+  console.log(`Ruta Perfil: GET/PUT http://${host}:${port}/api/auth/profile`);
+  console.log(`Ruta Foto Perfil: PUT http://${host}:${port}/api/auth/profile/photo`);
+  console.log(`Ruta Cambiar Contraseña: POST http://${host}:${port}/api/auth/change-password`);
   console.log(`JWT Configurado: ${JWT_SECRET ? 'SI' : 'NO'}`);
   console.log(`Google Client ID Configurado: ${GOOGLE_CLIENT_ID ? 'SI' : 'NO'}`);
 });
