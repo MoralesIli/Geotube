@@ -156,12 +156,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }) => {
         body: JSON.stringify({ token: response.credential }),
       });
 
-<<<<<<< HEAD
-      console.log(' Respuesta del backend recibida, status:', backendResponse.status);
-=======
-
       console.log('📥 Respuesta del backend recibida, status:', backendResponse.status);
->>>>>>> d3058248a33d9268330573cba182184c105d7b5d
 
       if (!backendResponse.ok) {
         // Si no es OK, intentar parsear como JSON primero
