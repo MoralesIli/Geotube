@@ -56,7 +56,7 @@ const ChangePhotoModal = ({ isOpen, onClose, user, onPhotoUpdate }) => {
       
       const token = localStorage.getItem('token');
       
-      console.log('📤 Subiendo foto de perfil...');
+      console.log(' Subiendo foto de perfil...');
       
       const response = await fetch(`${API_BASE_URL}/api/auth/profile/photo`, {
         method: 'PUT',
@@ -67,7 +67,7 @@ const ChangePhotoModal = ({ isOpen, onClose, user, onPhotoUpdate }) => {
         body: JSON.stringify({ foto: base64Image })
       });
 
-      console.log('📥 Respuesta del servidor:', response.status);
+      console.log(' Respuesta del servidor:', response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -81,7 +81,7 @@ const ChangePhotoModal = ({ isOpen, onClose, user, onPhotoUpdate }) => {
 
       const data = await response.json();
 
-      console.log('✅ Foto actualizada:', data.user);
+      console.log(' Foto actualizada:', data.user);
 
       // Actualizar localStorage y estado
       const currentUser = JSON.parse(localStorage.getItem('user'));

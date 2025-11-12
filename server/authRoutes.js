@@ -12,8 +12,6 @@ const db = mysql.createConnection({
   database: 'geotube_db',
 });
 
-const JWT_SECRET = 'tu_clave_secreta_jwt_muy_segura_aqui_12345';
-
 // Middleware para verificar token
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];

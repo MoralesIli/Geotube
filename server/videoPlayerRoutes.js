@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const mysql = require('mysql2');
 
-// Configuración de la base de datos (usar la misma conexión)
+// Configuración de la base de datos 
 const db = mysql.createConnection({
   host: 'localhost',
   user: 'root',
@@ -19,8 +19,7 @@ const registrarAccesoVideo = async (req, res, next) => {
   const user_agent = req.get('User-Agent');
   
   // Verificar si la ubicación es válida (dentro de México)
-  // Puedes obtener esto del frontend o verificar en el backend
-  const es_valido = 1; // Por defecto asumimos válido
+  const es_valido = 1;
   
   try {
     await db.promise().execute(
