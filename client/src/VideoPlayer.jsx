@@ -627,7 +627,8 @@ const VideoPlayer = () => {
       <header className="glass-effect border-b border-gray-700 p-4 bg-gray-800/80 backdrop-blur-sm">
         <div className="container mx-auto">
           <div className="flex items-center justify-between mb-4">
-            <div className="contenedor-busqueda">
+            {/* ✅ CORRECCIÓN: Título en contenedor separado sin overflow-hidden */}
+            <div className="header-titulo">
               <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
                 VideoMap Pro
               </h1>
@@ -744,7 +745,9 @@ const VideoPlayer = () => {
                   )}
                 </div>
               </div>
-              <div className="bg-black">
+              
+              {/* ✅ CORRECCIÓN: Eliminado bg-black y usando video-container */}
+              <div className="video-container">
                 <YouTube videoId={videoId} opts={youtubeOpts} />
               </div>
             </div>
