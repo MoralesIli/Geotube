@@ -1,69 +1,60 @@
 import React, {
-  useState,
-  useEffect,
   useRef,
   useCallback,
   useMemo,
+  useEffect,
 } from "react";
 import { useNavigate } from "react-router-dom";
-import Map, { Marker, NavigationControl, Popup } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
-import YouTube from "react-youtube";
-import AuthModal from "./components/models/AuthModal";
-import ChangePasswordModal from "./components/models/ChangePasswordModal";
-import ChangePhotoModal from "./components/models/ChangePhotoModal";
-import CommentsModal from "./components/models/CommentsModal";
-import "./MainApp.css";
+import "./styles/MainApp.css";
+
+// Importar hooks personalizados
+import { useAppInitialization } from "./hooks/useAppInitialization";
+import { useVideoOperations } from "./hooks/useVideoOperations";
+
+// Importar componentes
+import MapComponent from "./components/MapComponent";
+import VideoSidebar from "./modals/VideoSidebar";
+import Navbar from "./components/Navbar";
+import Modals from "./Modals";
+
+// Importar utilidades
+import { restrictedCountries, restrictedCities, regionConfig, categories } from "./utils/constants";
 
 const MainApp = () => {
-  // Estados principales
-  const [viewport, setViewport] = useState({
-    latitude: 23.6345,
-    longitude: -102.5528,
-    zoom: 2,
-  });
-  const [targetViewport, setTargetViewport] = useState(null);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [userLocation, setUserLocation] = useState(null);
-  const [userLocationName, setUserLocationName] = useState("");
-  const [videos, setVideos] = useState([]);
-  const [selectedVideo, setSelectedVideo] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [activeSearchTerm, setActiveSearchTerm] = useState("");
-  const [showProfile, setShowProfile] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [showPhotoModal, setShowPhotoModal] = useState(false);
-  const [showCommentsModal, setShowCommentsModal] = useState(false);
-  const [user, setUser] = useState(null);
-  const [loadingVideos, setLoadingVideos] = useState(false);
-  const [activeFilter, setActiveFilter] = useState("mexico");
-  const [nextPageToken, setNextPageToken] = useState("");
-  const [searchLocation, setSearchLocation] = useState(null);
-  const [hasMoreVideos, setHasMoreVideos] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [clickedLocation, setClickedLocation] = useState(null);
-  const [clickedLocationName, setClickedLocationName] = useState("");
-  const [showLocationPopup, setShowLocationPopup] = useState(false);
-  const [isValidLocation, setIsValidLocation] = useState(false);
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [userHistory, setUserHistory] = useState([]);
-  const [currentRegion, setCurrentRegion] = useState("MX");
-  const [youtubeAvailable, setYoutubeAvailable] = useState(true);
-  const [youtubeError, setYoutubeError] = useState("");
-  const [suggestions, setSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [searchError, setSearchError] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState(null);
+  // Usar hooks personalizados
+  const appState = useAppInitialization();
+  const videoState = useVideoOperations();
 
-  // ESTADOS PARA CONTROLAR VISTA MÓVIL
-  const [isMobile, setIsMobile] = useState(false);
-  const [showSidebar, setShowSidebar] = useState(false);
-  const [showSearchBar, setShowSearchBar] = useState(false);
-  const [orientation, setOrientation] = useState('portrait');
+  // Desestructurar estados y funciones
+  const {
+    // Estados de la app
+    viewport, setViewport, targetViewport, setTargetViewport, isAnimating, setIsAnimating,
+    userLocation, setUserLocation, userLocationName, setUserLocationName, searchTerm, setSearchTerm,
+    activeSearchTerm, setActiveSearchTerm, showProfile, setShowProfile, showAuthModal, setShowAuthModal,
+    showSettings, setShowSettings, showPasswordModal, setShowPasswordModal, showPhotoModal, setShowPhotoModal,
+    showCommentsModal, setShowCommentsModal, user, setUser, activeFilter, setActiveFilter,
+    searchLocation, setSearchLocation, clickedLocation, setClickedLocation, clickedLocationName, setClickedLocationName,
+    showLocationPopup, setShowLocationPopup, isValidLocation, setIsValidLocation, showHistoryModal, setShowHistoryModal,
+    userHistory, setUserHistory, currentRegion, setCurrentRegion, youtubeAvailable, setYoutubeAvailable,
+    youtubeError, setYoutubeError, suggestions, setSuggestions, showSuggestions, setShowSuggestions,
+    searchError, setSearchError, selectedCategory, setSelectedCategory, isMobile, setIsMobile,
+    showSidebar, setShowSidebar, showSearchBar, setShowSearchBar, orientation, setOrientation,
+    
+    // Funciones
+    toggleVideosVisibility,
+  } = appState;
 
-  // Referencias
+  const {
+    // Estados de video
+    videos, setVideos, selectedVideo, setSelectedVideo, loadingVideos, setLoadingVideos,
+    nextPageToken, setNextPageToken, hasMoreVideos, setHasMoreVideos, isLoadingMore, setIsLoadingMore,
+    
+    // Handlers de video
+    handleVideoClick, handleVideoDoubleClick, handleWatchComplete,
+  } = videoState;
+
+  // Referencias y navegación
   const animationRef = useRef();
   const startViewportRef = useRef(null);
   const searchInputRef = useRef(null);
@@ -74,150 +65,6 @@ const MainApp = () => {
   const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
   const YOUTUBE_API_KEY = process.env.REACT_APP_YOUTUBE_API_KEY;
   const API_BASE_URL = process.env.REACT_APP_API_URL;
-
-  // Efecto para detectar tamaño de pantalla y orientación
-  useEffect(() => {
-    const checkMobileAndOrientation = () => {
-      if (typeof window === "undefined") return;
-      
-      const width = window.innerWidth || 1024;
-      const isMobileDetected = width < 1024;
-      const isLandscape = width > window.innerHeight;
-
-      setIsMobile(isMobileDetected);
-      setOrientation(isLandscape ? 'landscape' : 'portrait');
-
-      // Actualizar clases del body para CSS
-      document.body.classList.toggle('orientation-landscape', isLandscape);
-      document.body.classList.toggle('orientation-portrait', !isLandscape);
-
-      if (width >= 1024) {
-        setShowSidebar(true);
-        setShowSearchBar(false);
-      } else {
-        setShowSidebar(false);
-      }
-    };
-
-    if (typeof window !== "undefined") {
-      checkMobileAndOrientation();
-      window.addEventListener("resize", checkMobileAndOrientation);
-      window.addEventListener("orientationchange", checkMobileAndOrientation);
-    }
-
-    return () => {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("resize", checkMobileAndOrientation);
-        window.removeEventListener("orientationchange", checkMobileAndOrientation);
-      }
-    };
-  }, []);
-
-  // PAÍSES Y CIUDADES RESTRINGIDAS
-  const restrictedCountries = useMemo(
-    () => [
-      "KP", "IR", "SY", "SS", "CU", "CN", "TM", "UZ", "TJ", "ER", "SD", "RU", "BY", "MM",
-    ],
-    []
-  );
-
-  const restrictedCities = useMemo(
-    () => [
-      "pyongyang", "corea del norte", "north korea", "korea dpr", "teherán", "tehran", 
-      "iran", "irán", "damasco", "damascus", "siria", "syria", "juba", "sudán del sur",
-      "south sudan", "la habana", "havana", "cuba", "beijing", "pekín", "shanghai",
-      "cantón", "guangzhou", "shenzhen", "china", "ashgabat", "asjabad", "turkmenistán",
-      "turkmenistan", "tashkent", "taskent", "uzbekistán", "uzbekistan", "dushanbe",
-      "tayikistán", "tajikistan", "asmara", "eritrea", "jartum", "khartoum", "sudán",
-      "sudan", "moscú", "moscow", "rusia", "russia", "minsk", "bielorrusia", "belarus",
-      "yangon", "myanmar", "birmania",
-    ],
-    []
-  );
-
-  // Configuración por región
-  const regionConfig = useMemo(
-    () => ({
-      MX: {
-        code: "MX",
-        name: "México",
-        center: [23.6345, -102.5528],
-        popularQueries: ["México", "CDMX", "Cancún", "Guadalajara", "Monterrey"],
-      },
-      US: {
-        code: "US",
-        name: "Estados Unidos",
-        center: [39.8283, -98.5795],
-        popularQueries: ["USA", "New York", "Los Angeles", "Chicago", "Miami"],
-      },
-      ES: {
-        code: "ES",
-        name: "España",
-        center: [40.4637, -3.7492],
-        popularQueries: ["España", "Madrid", "Barcelona", "Valencia", "Sevilla"],
-      },
-      CN: {
-        code: "CN",
-        name: "China",
-        center: [35.8617, 104.1954],
-        popularQueries: ["China", "Beijing", "Shanghai", "Guangzhou", "Shenzhen"],
-      },
-      RU: {
-        code: "RU",
-        name: "Rusia",
-        center: [61.524, 105.3188],
-        popularQueries: ["Rusia", "Moscú", "San Petersburgo", "Novosibirsk", "Ekaterimburgo"],
-      },
-    }),
-    []
-  );
-
-  // Categorías de búsqueda
-  const categories = useMemo(
-    () => [
-      {
-        id: "cultura",
-        name: "Cultura",
-        keywords: ["Cultura", "Tradiciones", "Costumbres", "Festividades", "Arte local"],
-        color: "from-purple-500 to-pink-500",
-        bgColor: "bg-gradient-to-r from-purple-500 to-pink-500",
-        icon: "🎭",
-      },
-      {
-        id: "gastronomia",
-        name: "Gastronomía",
-        keywords: ["Comida típica", "Gastronomía", "Platos regionales", "Bebidas tradicionales"],
-        color: "from-orange-500 to-red-500",
-        bgColor: "bg-gradient-to-r from-orange-500 to-red-500",
-        icon: "🍽️",
-      },
-      {
-        id: "naturaleza",
-        name: "Naturaleza",
-        keywords: ["Turismo", "Lugares turísticos", "Parques naturales", "Playas", "Montañas"],
-        color: "from-green-500 to-emerald-500",
-        bgColor: "bg-gradient-to-r from-green-500 to-emerald-500",
-        icon: "🌳",
-      },
-      {
-        id: "historia",
-        name: "Historia",
-        keywords: ["Historia del lugar", "Personajes históricos", "Museos", "Patrimonio mundial"],
-        color: "from-amber-500 to-yellow-500",
-        bgColor: "bg-gradient-to-r from-amber-500 to-yellow-500",
-        icon: "🏛️",
-      },
-      {
-        id: "entretenimiento",
-        name: "Entretenimiento",
-        keywords: ["Eventos culturales", "Festivales", "Música moderna", "Vida nocturna"],
-        color: "from-blue-500 to-cyan-500",
-        bgColor: "bg-gradient-to-r from-blue-500 to-cyan-500",
-        icon: "🎪",
-      },
-    ],
-    []
-  );
 
   // Función para validar tipo de ubicación
   const isValidLocationType = useCallback((feature) => {
@@ -383,7 +230,7 @@ const MainApp = () => {
     async (latitude, longitude, locationName, query = "", pageToken = "") => {
       try {
         const searchQuery = query || locationName.split(",")[0].trim();
-        console.log("🎯 Buscando en YouTube para ubicación:", {
+        console.log("Buscando en YouTube para ubicación:", {
           query: searchQuery,
           location: locationName,
           coordinates: { latitude, longitude },
@@ -409,7 +256,7 @@ const MainApp = () => {
           url += `&pageToken=${pageToken}`;
         }
 
-        console.log("📡 URL de búsqueda YouTube:", url);
+        console.log("URL de búsqueda YouTube:", url);
 
         const searchResponse = await fetch(url);
 
@@ -425,7 +272,7 @@ const MainApp = () => {
         const searchData = await searchResponse.json();
 
         if (!searchData.items?.length) {
-          console.log("❌ No se encontraron videos subidos en esta ubicación");
+          console.log("No se encontraron videos subidos en esta ubicación");
           return {
             videos: [],
             nextPageToken: "",
@@ -447,7 +294,7 @@ const MainApp = () => {
                 videoDetails?.recordingDetails?.location ||
                 videoDetails?.snippet?.locationDescription;
 
-              console.log("📍 Metadata de ubicación del video:", {
+              console.log("Metadata de ubicación del video:", {
                 videoId: item.id.videoId,
                 hasLocationData: hasLocationData,
                 recordingDetails: videoDetails?.recordingDetails,
@@ -491,7 +338,7 @@ const MainApp = () => {
 
         if (youtubeVideos.length === 0) {
           console.log(
-            "⚠️ No hay videos con metadata de ubicación, usando búsqueda normal"
+            "No hay videos con metadata de ubicación, usando búsqueda normal"
           );
 
           for (const item of searchData.items.slice(0, 12)) {
@@ -523,7 +370,7 @@ const MainApp = () => {
         }
 
         console.log(
-          "✅ Videos encontrados con ubicación:",
+          "Videos encontrados con ubicación:",
           youtubeVideos.length
         );
 
@@ -608,7 +455,7 @@ const MainApp = () => {
         return [];
       }
     },
-    [YOUTUBE_API_KEY, regionConfig]
+    [YOUTUBE_API_KEY, regionConfig, setVideos, setActiveFilter, setNextPageToken, setHasMoreVideos, setYoutubeAvailable, setYoutubeError]
   );
 
   // Cargar videos para ubicación
@@ -647,7 +494,7 @@ const MainApp = () => {
           setActiveFilter("search");
           setSearchLocation({ latitude, longitude, name: locationName });
 
-          console.log("✅ Videos cargados para ubicación:", {
+          console.log("Videos cargados para ubicación:", {
             location: locationName,
             videos: result.videos.length,
             withLocationData: result.videos.filter((v) => v.confirmedLocation)
@@ -661,7 +508,7 @@ const MainApp = () => {
             setActiveFilter("no-videos");
 
             console.log(
-              "❌ No se encontraron videos subidos en:",
+              "No se encontraron videos subidos en:",
               locationName
             );
 
@@ -692,12 +539,18 @@ const MainApp = () => {
         }
       }
     },
-    [searchYouTubeVideosByLocation, fetchPopularVideosByRegion, currentRegion]
+    [searchYouTubeVideosByLocation, fetchPopularVideosByRegion, currentRegion, setVideos, setNextPageToken, setHasMoreVideos, setActiveFilter, setSearchLocation, setLoadingVideos, setIsLoadingMore]
   );
 
-  // Función para mover mapa a ubicación
+  // Función para mover mapa a ubicación - CORREGIDA
   const moveMapToLocation = useCallback(
     async (locationName) => {
+      // ✅ BLOQUEAR SI YA HAY ANIMACIÓN
+      if (isAnimating) {
+        console.log("Animación en curso, ignorando nuevo movimiento.");
+        return;
+      }
+
       try {
         const locationData = await getLocationCoordinates(locationName);
 
@@ -721,7 +574,7 @@ const MainApp = () => {
         console.error("Error moviendo el mapa a la ubicación:", error);
       }
     },
-    [getLocationCoordinates]
+    [getLocationCoordinates, setTargetViewport, setClickedLocation, setClickedLocationName, setIsValidLocation, isAnimating]
   );
 
   // Función para verificar restricciones
@@ -811,7 +664,7 @@ const MainApp = () => {
         setSuggestions([]);
       }
     },
-    [MAPBOX_TOKEN, isValidLocationType]
+    [MAPBOX_TOKEN, isValidLocationType, setSuggestions]
   );
 
   // Función para detectar región del usuario
@@ -865,17 +718,13 @@ const MainApp = () => {
       console.warn("Error en detección de región:", error);
     }
     return "MX";
-  }, [MAPBOX_TOKEN, restrictedCountries, regionConfig]);
+  }, [MAPBOX_TOKEN, restrictedCountries, regionConfig, setYoutubeAvailable, setYoutubeError]);
 
   // Función para verificar disponibilidad de YouTube
   const checkYouTubeAvailability = useCallback(async () => {
     try {
       const response = await fetch(
-        `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=dQw4w9WgXcQ&key=${YOUTUBE_API_KEY}`,
-        {
-          method: "GET",
-          signal: AbortSignal.timeout(10000),
-        }
+        `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=dQw4w9WgXcQ&key=${YOUTUBE_API_KEY}`
       );
 
       if (response.ok) {
@@ -894,7 +743,7 @@ const MainApp = () => {
       setYoutubeError("No se puede acceder a YouTube en tu país");
       return false;
     }
-  }, [YOUTUBE_API_KEY]);
+  }, [YOUTUBE_API_KEY, setYoutubeAvailable, setYoutubeError]);
 
   // Función para registrar acceso a video
   const registerVideoAccess = useCallback(
@@ -950,7 +799,7 @@ const MainApp = () => {
       console.error("Error obteniendo historial:", error);
       return [];
     }
-  }, [API_BASE_URL, user]);
+  }, [API_BASE_URL, user, setUserHistory]);
 
   // Función para limpiar historial
   const clearUserHistory = useCallback(async () => {
@@ -976,13 +825,13 @@ const MainApp = () => {
       console.error("Error limpiando historial:", error);
       alert("Error limpiando el historial");
     }
-  }, [API_BASE_URL, user]);
+  }, [API_BASE_URL, user, setUserHistory]);
 
   // Búsqueda automática cuando hay término activo y cambia la ubicación
   const autoSearchOnLocationChange = useCallback(async () => {
     if (!activeSearchTerm.trim()) return;
 
-    console.log("🔄 Búsqueda automática por cambio de ubicación:", {
+    console.log("Búsqueda automática por cambio de ubicación:", {
       termino: activeSearchTerm,
       ubicacion_clickeada: clickedLocation ? clickedLocationName : "none",
       ubicacion_actual: userLocation ? userLocationName : "none",
@@ -1023,7 +872,7 @@ const MainApp = () => {
         activeSearchTerm
       );
 
-      console.log("✅ Búsqueda automática exitosa:", {
+      console.log("Búsqueda automática exitosa:", {
         termino: activeSearchTerm,
         ubicacion: locationName,
       });
@@ -1042,6 +891,7 @@ const MainApp = () => {
     loadVideosForLocation,
     checkRestrictions,
     isValidMapLocation,
+    setLoadingVideos
   ]);
 
   // Buscar videos para ubicación clickeada
@@ -1066,7 +916,7 @@ const MainApp = () => {
         searchQuery
       );
 
-      console.log("✅ Búsqueda exitosa en ubicación clickeada:", {
+      console.log("Búsqueda exitosa en ubicación clickeada:", {
         query: searchQuery,
         location: clickedLocationName,
       });
@@ -1084,16 +934,21 @@ const MainApp = () => {
     clickedLocationName,
     searchTerm,
     loadVideosForLocation,
+    setLoadingVideos
   ]);
 
-  // Manejador de clic en el mapa
+  // Manejador de clic en el mapa - CORREGIDO
   const handleMapClick = useCallback(
     async (event) => {
       const { lngLat } = event;
       const clickedLat = lngLat.lat;
       const clickedLng = lngLat.lng;
 
-      if (isAnimating) return;
+      // ✅ BLOQUEAR SI YA HAY ANIMACIÓN
+      if (isAnimating) {
+        console.log("Animación en curso, ignorando clic en mapa.");
+        return;
+      }
 
       const isInLandArea =
         clickedLat > -60 &&
@@ -1146,25 +1001,28 @@ const MainApp = () => {
           setIsValidLocation(true);
           setShowLocationPopup(true);
 
-          setTimeout(() => {
-            setTargetViewport({
-              latitude: clickedLat,
-              longitude: clickedLng,
-              zoom: 10,
-            });
-          }, 100);
+          // ✅ SIN setTimeout - MOVIMIENTO DIRECTO
+          setTargetViewport({
+            latitude: clickedLat,
+            longitude: clickedLng,
+            zoom: 10,
+          });
 
           if (activeSearchTerm.trim()) {
-            setTimeout(() => {
-              console.log(
-                "🔄 Búsqueda automática en nueva ubicación clickeada:",
-                {
-                  termino: activeSearchTerm,
-                  ubicacion: locationCheck.placeName,
-                }
-              );
-              autoSearchOnLocationChange();
-            }, 800);
+            // ✅ SIN setTimeout - CARGA DIRECTA
+            console.log(
+              "Búsqueda automática en nueva ubicación clickeada:",
+              {
+                termino: activeSearchTerm,
+                ubicacion: locationCheck.placeName,
+              }
+            );
+            await loadVideosForLocation(
+              clickedLat,
+              clickedLng,
+              locationCheck.placeName,
+              activeSearchTerm
+            );
           }
         } else {
           setIsValidLocation(false);
@@ -1201,13 +1059,25 @@ const MainApp = () => {
       checkRestrictions,
       isAnimating,
       activeSearchTerm,
-      autoSearchOnLocationChange,
+      loadVideosForLocation,
+      setClickedLocation,
+      setClickedLocationName,
+      setIsValidLocation,
+      setShowLocationPopup,
+      setTargetViewport,
+      setLoadingVideos
     ]
   );
 
   // Buscar videos por categoría
   const searchVideosByCategory = useCallback(
     async (category, pageToken = "", isLoadMore = false) => {
+      // ✅ BLOQUEAR SI YA HAY ANIMACIÓN
+      if (isAnimating && !isLoadMore) {
+        console.log("Animación en curso, ignorando búsqueda por categoría.");
+        return;
+      }
+
       if (!isLoadMore) {
         setLoadingVideos(true);
         setSelectedCategory(category);
@@ -1286,11 +1156,21 @@ const MainApp = () => {
       isValidMapLocation,
       checkRestrictions,
       loadVideosForLocation,
+      setLoadingVideos,
+      setSelectedCategory,
+      setIsLoadingMore,
+      isAnimating
     ]
   );
 
   // Cargar videos cercanos
   const fetchOtherVideos = useCallback(async () => {
+    // ✅ BLOQUEAR SI YA HAY ANIMACIÓN
+    if (isAnimating) {
+      console.log("Animación en curso, ignorando carga de videos cercanos.");
+      return;
+    }
+
     let latitude, longitude, locationName;
 
     if (clickedLocation && isValidLocation) {
@@ -1347,10 +1227,20 @@ const MainApp = () => {
     loadVideosForLocation,
     checkRestrictions,
     isValidMapLocation,
+    setLoadingVideos,
+    setTargetViewport,
+    setShowLocationPopup,
+    isAnimating
   ]);
 
   // Cargar videos populares
   const fetchPopularVideos = useCallback(async () => {
+    // ✅ BLOQUEAR SI YA HAY ANIMACIÓN
+    if (isAnimating) {
+      console.log("Animación en curso, ignorando carga de videos populares.");
+      return;
+    }
+
     let latitude, longitude, locationName;
 
     if (clickedLocation && isValidLocation) {
@@ -1407,11 +1297,21 @@ const MainApp = () => {
     loadVideosForLocation,
     checkRestrictions,
     isValidMapLocation,
+    setLoadingVideos,
+    setTargetViewport,
+    setShowLocationPopup,
+    isAnimating
   ]);
 
   // Búsqueda mejorada
   const fetchVideos = useCallback(
     async (query, pageToken = "", isLoadMore = false) => {
+      // ✅ BLOQUEAR SI YA HAY ANIMACIÓN
+      if (isAnimating && !isLoadMore) {
+        console.log("Animación en curso, ignorando búsqueda.");
+        return;
+      }
+
       if (!query.trim() && !isLoadMore) {
         setSearchError("Por favor ingresa un término de búsqueda válido.");
         return;
@@ -1433,7 +1333,7 @@ const MainApp = () => {
           longitude = clickedLocation.longitude;
           locationName = clickedLocationName;
 
-          console.log("🔍 Búsqueda con ubicación clickeada:", {
+          console.log("Búsqueda con ubicación clickeada:", {
             query: query,
             location: locationName,
             coordinates: { latitude, longitude },
@@ -1443,14 +1343,14 @@ const MainApp = () => {
           longitude = userLocation.longitude;
           locationName = userLocationName;
 
-          console.log("🔍 Búsqueda con ubicación actual:", {
+          console.log("Búsqueda con ubicación actual:", {
             query: query,
             location: locationName,
             coordinates: { latitude, longitude },
           });
         } else {
           console.log(
-            "⚠️  No hay ubicación activa, buscando ubicación para:",
+            "No hay ubicación activa, buscando ubicación para:",
             query
           );
 
@@ -1470,7 +1370,7 @@ const MainApp = () => {
               });
             }
 
-            console.log("📍 Nueva ubicación encontrada:", locationName);
+            console.log("Nueva ubicación encontrada:", locationName);
           } catch (error) {
             throw new Error(
               "Primero activa tu ubicación o selecciona una en el mapa. Error: " +
@@ -1502,7 +1402,7 @@ const MainApp = () => {
           isLoadMore
         );
       } catch (error) {
-        console.error("❌ Error en búsqueda:", error);
+        console.error("Error en búsqueda:", error);
         if (!isLoadMore) {
           setSearchError(
             error.message ||
@@ -1527,6 +1427,12 @@ const MainApp = () => {
       checkRestrictions,
       isValidMapLocation,
       loadVideosForLocation,
+      setSearchError,
+      setIsLoadingMore,
+      setLoadingVideos,
+      setActiveSearchTerm,
+      setTargetViewport,
+      isAnimating
     ]
   );
 
@@ -1585,7 +1491,124 @@ const MainApp = () => {
     userLocationName,
   ]);
 
-  // Efecto de animación
+  // Obtener ubicación del usuario - COMPLETAMENTE CORREGIDA
+  const getUserLocation = useCallback(async () => {
+    // ✅ BLOQUEAR SI YA HAY ANIMACIÓN
+    if (isAnimating) {
+      console.log("Animación en curso, ignorando obtención de ubicación.");
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      alert("La geolocalización no es compatible con este navegador.");
+      return fetchPopularVideosByRegion(currentRegion);
+    }
+
+    console.log("Iniciando obtención de ubicación...");
+
+    // Limpiar estados primero
+    setClickedLocation(null);
+    setClickedLocationName("");
+    setIsValidLocation(false);
+    setShowLocationPopup(false);
+
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 30000,
+        });
+      });
+
+      const { latitude, longitude } = position.coords;
+      console.log("Ubicación obtenida:", { latitude, longitude });
+
+      // Establecer la ubicación del usuario
+      setUserLocation({ latitude, longitude });
+
+      // Obtener nombre de la ubicación
+      const locationName = await getLocationName(latitude, longitude);
+      setUserLocationName(locationName);
+
+      // Verificar restricciones
+      const locationCheck = await isValidMapLocation(latitude, longitude);
+      const restrictionCheck = checkRestrictions(locationName, {
+        countryCode: locationCheck.countryCode,
+        locationName: locationName,
+      });
+
+      if (restrictionCheck.restricted) {
+        alert(restrictionCheck.message);
+        await fetchPopularVideosByRegion(currentRegion);
+        return;
+      }
+
+      // ✅ MOVER EL MAPA UNA SOLA VEZ - SIN setTimeout
+      console.log("Moviendo mapa a ubicación...");
+      setTargetViewport({
+        latitude: latitude,
+        longitude: longitude,
+        zoom: 12,
+      });
+
+      // ✅ CARGAR VIDEOS DIRECTAMENTE - SIN setTimeout
+      try {
+        if (activeSearchTerm.trim()) {
+          console.log("Búsqueda automática en ubicación actual:", activeSearchTerm);
+          await loadVideosForLocation(
+            latitude,
+            longitude,
+            locationName,
+            activeSearchTerm
+          );
+        } else {
+          await loadVideosForLocation(latitude, longitude, locationName);
+        }
+
+        // Guardar ubicación en localStorage
+        localStorage.setItem(
+          "userLocation",
+          JSON.stringify({
+            latitude,
+            longitude,
+            name: locationName,
+          })
+        );
+      } catch (error) {
+        console.error("Error cargando videos:", error);
+      }
+
+    } catch (error) {
+      console.error("Error obteniendo ubicación:", error);
+      
+      if (error.code === error.TIMEOUT) {
+        alert("Tiempo de espera agotado al obtener la ubicación.");
+      } else {
+        alert("No se pudo obtener tu ubicación. Asegúrate de permitir el acceso a la ubicación.");
+      }
+      
+      await fetchPopularVideosByRegion(currentRegion);
+    }
+  }, [
+    getLocationName,
+    loadVideosForLocation,
+    fetchPopularVideosByRegion,
+    currentRegion,
+    checkRestrictions,
+    isValidMapLocation,
+    isAnimating,
+    activeSearchTerm,
+    setClickedLocation,
+    setClickedLocationName,
+    setIsValidLocation,
+    setShowLocationPopup,
+    setUserLocation,
+    setUserLocationName,
+    setTargetViewport
+  ]);
+
+  // Efecto de animación - COMPLETAMENTE CORREGIDO
   useEffect(() => {
     if (!targetViewport) return;
 
@@ -1609,10 +1632,8 @@ const MainApp = () => {
       const end = targetViewport;
 
       const newViewport = {
-        latitude:
-          start.latitude + (end.latitude - start.latitude) * easedProgress,
-        longitude:
-          start.longitude + (end.longitude - start.longitude) * easedProgress,
+        latitude: start.latitude + (end.latitude - start.latitude) * easedProgress,
+        longitude: start.longitude + (end.longitude - start.longitude) * easedProgress,
         zoom: start.zoom + (end.zoom - start.zoom) * easedProgress,
       };
 
@@ -1624,6 +1645,7 @@ const MainApp = () => {
         setViewport({ ...end });
         setIsAnimating(false);
         setTargetViewport(null);
+        console.log("Animación completada");
       }
     };
 
@@ -1632,9 +1654,10 @@ const MainApp = () => {
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
+        setIsAnimating(false);
       }
     };
-  }, [targetViewport]);
+  }, [targetViewport]); // ✅ QUITAMOS viewport DE LAS DEPENDENCIAS
 
   // Efecto para búsqueda automática
   useEffect(() => {
@@ -1732,103 +1755,13 @@ const MainApp = () => {
     detectUserRegion,
     fetchPopularVideosByRegion,
     loadVideosForLocation,
-  ]);
-
-  // Obtener ubicación del usuario
-  const getUserLocation = useCallback(async () => {
-    if (!navigator.geolocation) {
-      alert("La geolocalización no es compatible con este navegador.");
-      return fetchPopularVideosByRegion(currentRegion);
-    }
-
-    if (isAnimating) return;
-
-    setClickedLocation(null);
-    setClickedLocationName("");
-    setIsValidLocation(false);
-    setShowLocationPopup(false);
-
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-
-        setTimeout(() => {
-          setTargetViewport({
-            latitude: latitude,
-            longitude: longitude,
-            zoom: 12,
-          });
-        }, 100);
-
-        setUserLocation({ latitude, longitude });
-
-        try {
-          const locationName = await getLocationName(latitude, longitude);
-          setUserLocationName(locationName);
-
-          const locationCheck = await isValidMapLocation(latitude, longitude);
-          const restrictionCheck = checkRestrictions(locationName, {
-            countryCode: locationCheck.countryCode,
-            locationName: locationName,
-          });
-
-          if (restrictionCheck.restricted) {
-            alert(restrictionCheck.message);
-            await fetchPopularVideosByRegion(currentRegion);
-            return;
-          }
-
-          if (activeSearchTerm.trim()) {
-            console.log(
-              "🔄 Búsqueda automática al regresar a ubicación actual:",
-              activeSearchTerm
-            );
-            await loadVideosForLocation(
-              latitude,
-              longitude,
-              locationName,
-              activeSearchTerm
-            );
-          } else {
-            await loadVideosForLocation(latitude, longitude, locationName);
-          }
-
-          localStorage.setItem(
-            "userLocation",
-            JSON.stringify({
-              latitude,
-              longitude,
-              name: locationName,
-            })
-          );
-        } catch (error) {
-          console.error("Error en operaciones:", error);
-          setUserLocationName("Ubicación actual");
-        }
-      },
-      (err) => {
-        console.error("Error obteniendo ubicación:", err);
-        setIsAnimating(false);
-        alert(
-          "No se pudo obtener tu ubicación. Asegúrate de permitir el acceso a la ubicación."
-        );
-        fetchPopularVideosByRegion(currentRegion);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 30000,
-      }
-    );
-  }, [
-    getLocationName,
-    loadVideosForLocation,
-    fetchPopularVideosByRegion,
-    currentRegion,
-    checkRestrictions,
-    isValidMapLocation,
-    isAnimating,
-    activeSearchTerm,
+    setUser,
+    setCurrentRegion,
+    setYoutubeAvailable,
+    setUserLocation,
+    setUserLocationName,
+    setVideos,
+    setActiveFilter
   ]);
 
   // Manejador de clic en sugerencias
@@ -1845,7 +1778,7 @@ const MainApp = () => {
         "- Esperando confirmación de ubicación"
       );
     },
-    [moveMapToLocation]
+    [moveMapToLocation, setSearchTerm, setShowSuggestions]
   );
 
   // Handlers para el buscador
@@ -1867,14 +1800,14 @@ const MainApp = () => {
         setShowSuggestions(false);
       }
     },
-    [fetchSuggestions]
+    [fetchSuggestions, setSearchTerm, setSearchError, setActiveSearchTerm, setShowSuggestions, setSuggestions]
   );
 
   const handleSearchSubmit = useCallback(
     (e) => {
       e.preventDefault();
       if (searchTerm.trim()) {
-        console.log("🚀 Iniciando búsqueda manual:", {
+        console.log("Iniciando búsqueda manual:", {
           termino: searchTerm,
           ubicacion_clickeada: clickedLocation ? clickedLocationName : "none",
           ubicacion_actual: userLocation ? userLocationName : "none",
@@ -1897,12 +1830,15 @@ const MainApp = () => {
       userLocation,
       userLocationName,
       isMobile,
+      setShowSuggestions,
+      setShowSearchBar,
+      setSearchError
     ]
   );
 
   const handleSearchFocus = useCallback(() => {
     setShowSuggestions(true);
-  }, []);
+  }, [setShowSuggestions]);
 
   // Handlers de UI
   const handleLogin = useCallback((userData) => {
@@ -1913,7 +1849,7 @@ const MainApp = () => {
     setUser(userData);
     setShowProfile(true);
     setShowAuthModal(false);
-  }, []);
+  }, [setUser, setShowProfile, setShowAuthModal]);
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem("token");
@@ -1922,163 +1858,12 @@ const MainApp = () => {
     setUser(null);
     setShowProfile(false);
     setShowSettings(false);
-  }, []);
+  }, [setUser, setShowProfile, setShowSettings]);
 
   const handlePhotoUpdate = useCallback((updatedUser) => {
     setUser(updatedUser);
     setShowProfile(false);
-  }, []);
-
-  const handleVideoClick = useCallback(
-    (video) => {
-      setSelectedVideo(video);
-      if (user) {
-        registerVideoAccess(video);
-      }
-    },
-    [user, registerVideoAccess]
-  );
-
-  const handleVideoDoubleClick = useCallback(
-    (video) => {
-      if (user) {
-        registerVideoAccess(video);
-      }
-
-      const locationState = {};
-
-      if (clickedLocation && isValidLocation) {
-        locationState.selectedLocation = {
-          latitude: clickedLocation.latitude,
-          longitude: clickedLocation.longitude,
-          name: clickedLocationName,
-        };
-      } else if (searchLocation) {
-        locationState.selectedLocation = {
-          latitude: searchLocation.latitude,
-          longitude: searchLocation.longitude,
-          name: searchLocation.name,
-        };
-      }
-
-      if (locationState.selectedLocation) {
-        localStorage.setItem(
-          "selectedLocation",
-          JSON.stringify(locationState.selectedLocation)
-        );
-      }
-
-      navigate(`/video/${video.youtube_video_id}`, {
-        state: locationState,
-      });
-    },
-    [
-      user,
-      registerVideoAccess,
-      clickedLocation,
-      isValidLocation,
-      clickedLocationName,
-      searchLocation,
-      navigate,
-    ]
-  );
-
-  const handleMarkerClick = useCallback(
-    (video) => {
-      setSelectedVideo(video);
-      if (user) {
-        registerVideoAccess(video);
-      }
-    },
-    [user, registerVideoAccess]
-  );
-
-  const handleMarkerDoubleClick = useCallback(
-    (video) => {
-      if (user) {
-        registerVideoAccess(video);
-      }
-
-      const locationState = {};
-
-      if (clickedLocation && isValidLocation) {
-        locationState.selectedLocation = {
-          latitude: clickedLocation.latitude,
-          longitude: clickedLocation.longitude,
-          name: clickedLocationName,
-        };
-      } else if (searchLocation) {
-        locationState.selectedLocation = {
-          latitude: searchLocation.latitude,
-          longitude: searchLocation.longitude,
-          name: searchLocation.name,
-        };
-      }
-
-      if (locationState.selectedLocation) {
-        localStorage.setItem(
-          "selectedLocation",
-          JSON.stringify(locationState.selectedLocation)
-        );
-      }
-
-      navigate(`/video/${video.youtube_video_id}`, {
-        state: locationState,
-      });
-    },
-    [
-      user,
-      registerVideoAccess,
-      clickedLocation,
-      isValidLocation,
-      clickedLocationName,
-      searchLocation,
-      navigate,
-    ]
-  );
-
-  const handleWatchComplete = useCallback(() => {
-    if (user && selectedVideo) {
-      registerVideoAccess(selectedVideo);
-    }
-
-    const locationState = {};
-
-    if (clickedLocation && isValidLocation) {
-      locationState.selectedLocation = {
-        latitude: clickedLocation.latitude,
-        longitude: clickedLocation.longitude,
-        name: clickedLocationName,
-      };
-    } else if (searchLocation) {
-      locationState.selectedLocation = {
-        latitude: searchLocation.latitude,
-        longitude: searchLocation.longitude,
-        name: searchLocation.name,
-      };
-    }
-
-    if (locationState.selectedLocation) {
-      localStorage.setItem(
-        "selectedLocation",
-        JSON.stringify(locationState.selectedLocation)
-      );
-    }
-
-    selectedVideo?.youtube_video_id &&
-      navigate(`/video/${selectedVideo.youtube_video_id}`, {
-        state: locationState,
-      });
-  }, [
-    user,
-    selectedVideo,
-    registerVideoAccess,
-    clickedLocation,
-    isValidLocation,
-    clickedLocationName,
-    searchLocation,
-    navigate,
-  ]);
+  }, [setUser, setShowProfile]);
 
   // Helper functions
   const getSidebarTitle = useCallback(() => {
@@ -2163,6 +1948,12 @@ const MainApp = () => {
       : `${minutes}:${seconds.padStart(2, "0")}`;
   }, []);
 
+  // Handler para doble clic en marcador
+  const handleMarkerDoubleClick = useCallback((video, user, registerVideoAccess, clickedLocation, isValidLocation, clickedLocationName, searchLocation, navigate) => {
+    console.log("Doble clic en marcador:", video);
+    handleVideoDoubleClick(video, user, registerVideoAccess, clickedLocation, isValidLocation, clickedLocationName, searchLocation, navigate);
+  }, [handleVideoDoubleClick]);
+
   // Componente de Sugerencias
   const SearchSuggestions = useCallback(() => {
     if (!showSuggestions || !suggestions.length) return null;
@@ -2208,681 +1999,62 @@ const MainApp = () => {
     );
   }, [showSuggestions, suggestions, handleSuggestionClick, isMobile]);
 
-  // Modal de Historial
-  const HistoryModal = useCallback(() => {
-    if (!showHistoryModal) return null;
-
-    return (
-      <div className="modal-overlay fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div
-          className={`modal-content w-full ${
-            isMobile ? "max-w-full h-full" : "max-w-4xl max-h-[90vh]"
-          } bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl shadow-2xl border border-cyan-500/20 overflow-hidden`}
-        >
-          <div className="relative p-4 sm:p-8 bg-gradient-to-r from-cyan-900/50 to-blue-900/50 border-b border-cyan-500/30">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl sm:text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-                  Historial de Videos Vistos
-                </h2>
-                <p className="text-cyan-300/80 text-xs sm:text-sm mt-1 sm:mt-2">
-                  {userHistory.length} video
-                  {userHistory.length !== 1 ? "s" : ""} en tu historial
-                </p>
-              </div>
-              <button
-                onClick={() => setShowHistoryModal(false)}
-                className="text-cyan-400 hover:text-cyan-300 text-2xl w-8 h-8 sm:w-10 sm:h-10 rounded-full hover:bg-cyan-400/10 transition-all duration-300 flex items-center justify-center"
-              >
-                ×
-              </button>
-            </div>
-          </div>
-
-          <div className="p-4 sm:p-6 overflow-y-auto max-h-[60vh]">
-            {userHistory.length === 0 ? (
-              <div className="text-center py-8 sm:py-12">
-                <div className="w-16 h-16 sm:w-24 sm:h-24 mx-auto mb-4 rounded-full bg-cyan-500/10 flex items-center justify-center">
-                  <svg
-                    className="w-8 h-8 sm:w-12 sm:h-12 text-cyan-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                    />
-                  </svg>
-                </div>
-                <h3 className="text-lg sm:text-xl font-semibold text-cyan-300 mb-2">
-                  Historial Vacío
-                </h3>
-                <p className="text-gray-400 text-sm">
-                  Los videos que veas aparecerán aquí
-                </p>
-              </div>
-            ) : (
-              <div className="grid gap-3 sm:gap-4">
-                {userHistory.map((item, index) => (
-                  <div
-                    key={index}
-                    className="group bg-gray-800/50 hover:bg-cyan-500/10 rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-gray-700 hover:border-cyan-500/30 transition-all duration-300"
-                  >
-                    <div className="flex items-start gap-3 sm:gap-4">
-                      <div className="flex-shrink-0 w-12 h-9 sm:w-16 sm:h-12 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-lg flex items-center justify-center">
-                        <svg
-                          className="w-4 h-4 sm:w-6 sm:h-6 text-white"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                          />
-                        </svg>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-white group-hover:text-cyan-300 transition-colors text-xs sm:text-sm leading-tight mb-1">
-                          {item.titulo}
-                        </h4>
-                        <p className="text-cyan-400 text-xs mb-1 sm:mb-2 truncate">
-                          {item.location_name}
-                        </p>
-                        <div className="flex items-center justify-between text-xs text-gray-400">
-                          <span>
-                            Visto el{" "}
-                            {new Date(item.fecha).toLocaleDateString("es-MX")}
-                          </span>
-                          <span>
-                            {new Date(item.fecha).toLocaleTimeString("es-MX", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {userHistory.length > 0 && (
-            <div className="p-4 sm:p-6 bg-gray-900/50 border-t border-gray-700">
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  onClick={clearUserHistory}
-                  className="flex-1 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white font-semibold py-3 px-4 sm:px-6 rounded-xl transition-all duration-300 transform hover:scale-105 text-sm sm:text-base"
-                >
-                  Limpiar Todo el Historial
-                </button>
-                <button
-                  onClick={() => setShowHistoryModal(false)}
-                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 px-4 sm:px-6 rounded-xl transition-all duration-300 text-sm sm:text-base"
-                >
-                  Cerrar
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }, [showHistoryModal, userHistory, clearUserHistory, isMobile]);
-
-  // Modal de Ajustes
-  const SettingsModal = useCallback(() => {
-    if (!showSettings) return null;
-
-    return (
-      <div className="modal-overlay fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div
-          className={`modal-content w-full ${
-            isMobile ? "max-w-full" : "max-w-md"
-          } bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl shadow-2xl border border-cyan-500/20`}
-        >
-          <div className="p-4 sm:p-6 bg-gradient-to-r from-cyan-900/50 to-blue-900/50 border-b border-cyan-500/30 rounded-t-3xl">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-                Ajustes
-              </h2>
-              <button
-                onClick={() => setShowSettings(false)}
-                className="text-cyan-400 hover:text-cyan-300 text-xl w-8 h-8 rounded-full hover:bg-cyan-400/10 transition-all duration-300 flex items-center justify-center"
-              >
-                ×
-              </button>
-            </div>
-          </div>
-
-          <div className="p-4 sm:p-6">
-            <div className="space-y-3 sm:space-y-4">
-              <button
-                onClick={() => {
-                  setShowSettings(false);
-                  setShowCommentsModal(true);
-                }}
-                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 px-4 sm:px-6 rounded-xl transition-all duration-300 transform hover:scale-105 text-sm sm:text-base"
-              >
-                <div className="flex items-center gap-2 sm:gap-3 justify-center">
-                  <svg
-                    className="w-4 h-4 sm:w-5 sm:h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
-                    />
-                  </svg>
-                  <span>Comentarios del Proyecto</span>
-                </div>
-              </button>
-
-              <button
-                onClick={async () => {
-                  await fetchUserHistory();
-                  setShowSettings(false);
-                  setShowHistoryModal(true);
-                }}
-                className="w-full group bg-gray-700/50 hover:bg-cyan-500/20 border border-gray-600 hover:border-cyan-500/50 rounded-xl p-3 sm:p-4 transition-all duration-300 transform hover:scale-105"
-              >
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-cyan-500/10 group-hover:bg-cyan-500/20 flex items-center justify-center transition-colors">
-                    <svg
-                      className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                      />
-                    </svg>
-                  </div>
-                  <div className="text-left">
-                    <p className="font-semibold text-white group-hover:text-cyan-300 text-sm sm:text-base">
-                      Ver Historial Completo
-                    </p>
-                    <p className="text-gray-400 text-xs sm:text-sm">
-                      Explora todos los videos que has visto
-                    </p>
-                  </div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      "¿Estás seguro de que quieres limpiar todo tu historial? Esta acción no se puede deshacer."
-                    )
-                  ) {
-                    clearUserHistory();
-                    setShowSettings(false);
-                  }
-                }}
-                className="w-full group bg-gray-700/50 hover:bg-red-500/20 border border-gray-600 hover:border-red-500/50 rounded-xl p-3 sm:p-4 transition-all duration-300 transform hover:scale-105"
-              >
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-red-500/10 group-hover:bg-red-500/20 flex items-center justify-center transition-colors">
-                    <svg
-                      className="w-4 h-4 sm:w-5 sm:h-5 text-red-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                      />
-                    </svg>
-                  </div>
-                  <div className="text-left">
-                    <p className="font-semibold text-white group-hover:text-red-300 text-sm sm:text-base">
-                      Limpiar Historial
-                    </p>
-                    <p className="text-gray-400 text-xs sm:text-sm">
-                      Eliminar todos los registros de visualización
-                    </p>
-                  </div>
-                </div>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }, [showSettings, fetchUserHistory, clearUserHistory, isMobile]);
-
   return (
     <div className="flex h-screen w-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 text-white overflow-hidden">
       {/* Navbar */}
-      <div
-        className={`navbar fixed top-0 left-0 w-full ${
-          isMobile ? "h-16" : "h-20"
-        } flex items-center justify-between px-4 sm:px-8 z-50 bg-gray-900/95 backdrop-blur-md border-b border-gray-700`}
-      >
-        {/* Logo y título */}
-        <div className="flex items-center gap-2 sm:gap-6">
-          <div className="flex items-center gap-2 sm:gap-4">
-            <h1
-              className={`font-bold text-gradient bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500 ${
-                isMobile ? "text-xl" : "text-3xl"
-              }`}
-            >
-              VideoMap
-            </h1>
-
-            {/* Indicadores de estado - SOLO ESCRITORIO */}
-            {!isMobile && !youtubeAvailable && (
-              <div className="bg-red-500/20 border border-red-500/50 rounded-lg px-3 py-1">
-                <p className="text-red-300 text-sm font-medium flex items-center gap-2">
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
-                    />
-                  </svg>
-                  YouTube no disponible - {regionConfig[currentRegion]?.name}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Botones de categorías - SOLO ESCRITORIO */}
-          {!isMobile && (
-            <div className="flex items-center gap-2">
-              {categories.map((category) => {
-                const hasValidLocation =
-                  (clickedLocation && isValidLocation) || userLocation;
-
-                return (
-                  <button
-                    key={category.id}
-                    onClick={() => searchVideosByCategory(category)}
-                    disabled={!hasValidLocation}
-                    className={`flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-white transition-all duration-200 transform hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium min-w-[90px] ${
-                      selectedCategory?.id === category.id
-                        ? `ring-1 ring-white ${category.bgColor}`
-                        : `bg-gradient-to-r ${category.color} hover:shadow-md`
-                    }`}
-                    title={
-                      hasValidLocation
-                        ? category.name
-                        : "Primero activa tu ubicación o selecciona una en el mapa"
-                    }
-                  >
-                    <span className="truncate">{category.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Controles de búsqueda y usuario */}
-        <div className="flex items-center gap-3 sm:gap-6">
-          {/* Botón de búsqueda en móvil */}
-          {isMobile && (
-            <button
-              onClick={() => setShowSearchBar(!showSearchBar)}
-              className="btn-primary flex items-center gap-2 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 p-2 rounded-lg transition-all duration-300"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-            </button>
-          )}
-
-          {/* Barra de búsqueda */}
-          {(!isMobile || showSearchBar) && (
-            <div className="relative">
-              <form onSubmit={handleSearchSubmit} className="flex items-center">
-                <div className="relative">
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    placeholder="Buscar términos..."
-                    value={searchTerm}
-                    onChange={handleSearchChange}
-                    onFocus={handleSearchFocus}
-                    className={`search-input glass-effect bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 ${
-                      isMobile ? "w-48 pr-8" : "w-80 pr-10"
-                    }`}
-                  />
-                  <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
-                    <svg
-                      className="w-4 h-4 text-gray-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                      />
-                    </svg>
-                  </div>
-                </div>
-
-                {!isMobile && (
-                  <button
-                    type="submit"
-                    className="ml-2 btn-primary bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 px-3 py-2 rounded-lg transition-all duration-300 text-sm"
-                  >
-                    Buscar
-                  </button>
-                )}
-              </form>
-
-              <SearchSuggestions />
-
-              {searchError && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-red-500/20 border border-red-500/50 rounded-lg p-2 text-red-300 text-xs">
-                  <div className="flex items-center gap-2">
-                    <svg
-                      className="w-3 h-3 flex-shrink-0"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
-                      />
-                    </svg>
-                    <span>{searchError}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Información de ubicación - SOLO ESCRITORIO */}
-          {!isMobile && userLocationName && (
-            <div className="text-right hidden sm:block">
-              <p className="text-sm text-cyan-400">Tu ubicación actual</p>
-              <p className="text-xs text-gray-300 truncate max-w-[120px]">
-                {userLocationName}
-              </p>
-            </div>
-          )}
-
-          {/* Botones de usuario */}
-          {user ? (
-            <>
-              <button
-                onClick={() => setShowSettings(true)}
-                className="btn-secondary flex items-center gap-1 sm:gap-2 bg-gray-700 hover:bg-gray-600 p-2 sm:px-3 sm:py-2 rounded-lg transition-all duration-300"
-              >
-                <svg
-                  className="w-4 h-4 sm:w-5 sm:h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                  />
-                </svg>
-                {!isMobile && <span className="text-sm">Ajustes</span>}
-              </button>
-
-              <div className="relative">
-                <button
-                  onClick={() => setShowProfile(!showProfile)}
-                  className={`user-avatar flex items-center justify-center text-white font-bold overflow-hidden border-2 border-cyan-500 ${
-                    isMobile ? "w-8 h-8 text-sm" : "w-10 h-10 text-lg"
-                  } rounded-full`}
-                  title={user.nombre}
-                >
-                  {user.foto ? (
-                    <img
-                      src={user.foto}
-                      alt="Foto de perfil"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-r from-cyan-500 to-blue-500 flex items-center justify-center">
-                      {user.nombre.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                </button>
-
-                {showProfile && (
-                  <div
-                    className={`absolute right-0 glass-effect bg-gray-800/95 backdrop-blur-md rounded-2xl shadow-2xl z-50 border border-gray-600 overflow-hidden ${
-                      isMobile ? "top-10 w-64" : "top-12 w-80"
-                    }`}
-                  >
-                    <div className="p-4 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-900">
-                      <div className="flex items-center gap-3">
-                        {user.foto ? (
-                          <img
-                            src={user.foto}
-                            alt="Foto de perfil"
-                            className="w-10 h-10 sm:w-14 sm:h-14 rounded-full object-cover border-2 border-cyan-500 shadow-lg"
-                          />
-                        ) : (
-                          <div
-                            className={`bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg ${
-                              isMobile
-                                ? "w-10 h-10 text-lg"
-                                : "w-14 h-14 text-xl"
-                            }`}
-                          >
-                            {user.nombre.charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold text-cyan-400 text-sm sm:text-lg truncate">
-                            {user.nombre}
-                          </p>
-                          <p className="text-gray-300 text-xs sm:text-sm truncate">
-                            {user.email}
-                          </p>
-                          {user.google_id && (
-                            <div className="flex items-center gap-1 mt-1">
-                              <svg
-                                className="w-3 h-3 sm:w-4 sm:h-4 text-green-400"
-                                fill="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-                              </svg>
-                              <p className="text-xs text-green-400 font-medium">
-                                Cuenta Google
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-2">
-                      <button
-                        onClick={() => {
-                          setShowProfile(false);
-                          setShowPhotoModal(true);
-                        }}
-                        className="w-full flex items-center gap-2 sm:gap-3 px-3 py-2 sm:px-4 sm:py-3 rounded-xl hover:bg-white/5 transition-all duration-200 text-gray-200 hover:text-white group text-sm sm:text-base"
-                      >
-                        <svg
-                          className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 group-hover:text-cyan-400 transition-colors"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                          />
-                        </svg>
-                        <span className="font-medium">Cambiar Foto</span>
-                      </button>
-
-                      {!user.google_id && (
-                        <button
-                          onClick={() => {
-                            setShowProfile(false);
-                            setShowPasswordModal(true);
-                          }}
-                          className="w-full flex items-center gap-2 sm:gap-3 px-3 py-2 sm:px-4 sm:py-3 rounded-xl hover:bg-white/5 transition-all duration-200 text-gray-200 hover:text-white group text-sm sm:text-base"
-                        >
-                          <svg
-                            className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 group-hover:text-cyan-400 transition-colors"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-                            />
-                          </svg>
-                          <span className="font-medium">
-                            Cambiar Contraseña
-                          </span>
-                        </button>
-                      )}
-
-                      <div className="border-t border-gray-700 my-1 sm:my-2"></div>
-
-                      <button
-                        onClick={handleLogout}
-                        className="w-full flex items-center gap-2 sm:gap-3 px-3 py-2 sm:px-4 sm:py-3 rounded-xl hover:bg-red-500/20 transition-all duration-200 text-red-400 hover:text-red-300 group text-sm sm:text-base"
-                      >
-                        <svg
-                          className="w-4 h-4 sm:w-5 sm:h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                          />
-                        </svg>
-                        <span className="font-medium">Cerrar Sesión</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </>
-          ) : (
-            <button
-              onClick={() => setShowAuthModal(true)}
-              className="btn-primary flex items-center gap-1 sm:gap-2 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 p-2 sm:px-3 sm:py-2 rounded-lg transition-all duration-300 text-sm"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                />
-              </svg>
-              {!isMobile && <span>Iniciar Sesión</span>}
-            </button>
-          )}
-        </div>
-      </div>
+      <Navbar
+        isMobile={isMobile}
+        youtubeAvailable={youtubeAvailable}
+        regionConfig={regionConfig}
+        currentRegion={currentRegion}
+        categories={categories}
+        clickedLocation={clickedLocation}
+        isValidLocation={isValidLocation}
+        userLocation={userLocation}
+        searchVideosByCategory={searchVideosByCategory}
+        selectedCategory={selectedCategory}
+        showSearchBar={showSearchBar}
+        setShowSearchBar={setShowSearchBar}
+        searchTerm={searchTerm}
+        handleSearchChange={handleSearchChange}
+        handleSearchSubmit={handleSearchSubmit}
+        handleSearchFocus={handleSearchFocus}
+        searchError={searchError}
+        userLocationName={userLocationName}
+        user={user}
+        showProfile={showProfile}
+        setShowProfile={setShowProfile}
+        setShowAuthModal={setShowAuthModal}
+        setShowSettings={setShowSettings}
+        setShowPhotoModal={setShowPhotoModal}
+        setShowPasswordModal={setShowPasswordModal}
+        handleLogout={handleLogout}
+        SearchSuggestions={SearchSuggestions}
+        getUserLocation={getUserLocation}
+      />
 
       {/* Modales */}
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        onLogin={handleLogin}
-      />
-
-      <ChangePasswordModal
-        isOpen={showPasswordModal}
-        onClose={() => setShowPasswordModal(false)}
+      <Modals
+        showAuthModal={showAuthModal}
+        setShowAuthModal={setShowAuthModal}
+        showPasswordModal={showPasswordModal}
+        setShowPasswordModal={setShowPasswordModal}
+        showPhotoModal={showPhotoModal}
+        setShowPhotoModal={setShowPhotoModal}
+        showCommentsModal={showCommentsModal}
+        setShowCommentsModal={setShowCommentsModal}
+        showHistoryModal={showHistoryModal}
+        setShowHistoryModal={setShowHistoryModal}
+        showSettings={showSettings}
+        setShowSettings={setShowSettings}
         user={user}
+        handleLogin={handleLogin}
+        handlePhotoUpdate={handlePhotoUpdate}
+        userHistory={userHistory}
+        clearUserHistory={clearUserHistory}
+        fetchUserHistory={fetchUserHistory}
+        isMobile={isMobile}
       />
-
-      <ChangePhotoModal
-        isOpen={showPhotoModal}
-        onClose={() => setShowPhotoModal(false)}
-        user={user}
-        onPhotoUpdate={handlePhotoUpdate}
-      />
-
-      <CommentsModal
-        isOpen={showCommentsModal}
-        onClose={() => setShowCommentsModal(false)}
-        user={user}
-      />
-
-      <HistoryModal />
-      <SettingsModal />
 
       {/* Contenido Principal */}
       <div
@@ -2891,413 +2063,64 @@ const MainApp = () => {
         }`}
       >
         {/* Mapa */}
-        <div
-          className={`relative mobile-map-container ${
-            isMobile ? (showSidebar ? "map-container-with-videos h-[55vh]" : "h-full") : "flex-1"
-          }`}
-        >
-          <Map
-            {...viewport}
-            style={{ width: "100%", height: "100%" }}
-            onMove={(evt) => !isAnimating && setViewport(evt.viewState)}
-            onClick={handleMapClick}
-            mapboxAccessToken={MAPBOX_TOKEN}
-            mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
-          >
-            {/* Ocultar controles en móvil */}
-            {!isMobile && <NavigationControl position="top-right" />}
+        <MapComponent
+          viewport={viewport}
+          setViewport={setViewport}
+          isAnimating={isAnimating}
+          MAPBOX_TOKEN={MAPBOX_TOKEN}
+          showLocationPopup={showLocationPopup}
+          clickedLocation={clickedLocation}
+          isValidLocation={isValidLocation}
+          clickedLocationName={clickedLocationName}
+          setShowLocationPopup={setShowLocationPopup}
+          searchVideosForClickedLocation={searchVideosForClickedLocation}
+          loadingVideos={loadingVideos}
+          searchTerm={searchTerm}
+          fetchVideos={fetchVideos}
+          userLocation={userLocation}
+          searchLocation={searchLocation}
+          videos={videos}
+          handleMarkerClick={(video) => handleVideoClick(video, user, registerVideoAccess)}
+          handleMarkerDoubleClick={(video) => handleMarkerDoubleClick(video, user, registerVideoAccess, clickedLocation, isValidLocation, clickedLocationName, searchLocation, navigate)}
+          isMobile={isMobile}
+          handleMapClick={handleMapClick}
+          getUserLocation={getUserLocation}
+          toggleVideosVisibility={toggleVideosVisibility}
+          youtubeAvailable={youtubeAvailable}
+          regionConfig={regionConfig}
+          currentRegion={currentRegion}
+          showSidebar={showSidebar}
+        />
 
-            {showLocationPopup && clickedLocation && (
-              <Popup
-                latitude={clickedLocation.latitude}
-                longitude={clickedLocation.longitude}
-                closeButton={false}
-                closeOnClick={false}
-                onClose={() => setShowLocationPopup(false)}
-                anchor="top"
-                className={`rounded-xl shadow-2xl border border-gray-300 bg-white/95 backdrop-blur-md ${
-                  isMobile ? "max-w-[90vw]" : ""
-                }`}
-              >
-                <div
-                  className={`text-center text-gray-800 ${
-                    isMobile ? "p-3 w-auto" : "p-4 w-65"
-                  }`}
-                >
-                  <h3
-                    className={`font-semibold leading-snug ${
-                      isMobile ? "text-base mb-1" : "text-lg mb-2"
-                    }`}
-                  >
-                    {isValidLocation
-                      ? clickedLocationName
-                      : "Ubicación no disponible"}
-                  </h3>
-
-                  {isValidLocation ? (
-                    <>
-                      <p
-                        className={`text-gray-600 mb-3 ${
-                          isMobile ? "text-xs" : "text-sm"
-                        }`}
-                      >
-                        Coordenadas:
-                        <br />
-                        <span className="font-medium">
-                          {clickedLocation.latitude.toFixed(4)},{" "}
-                          {clickedLocation.longitude.toFixed(4)}
-                        </span>
-                      </p>
-
-                      <div
-                        className={`space-y-2 ${
-                          isMobile ? "space-y-1" : "space-y-2"
-                        }`}
-                      >
-                        <button
-                          onClick={searchVideosForClickedLocation}
-                          disabled={loadingVideos}
-                          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium shadow-md transition-all duration-200 disabled:opacity-50"
-                        >
-                          {loadingVideos
-                            ? "Buscando..."
-                            : "Videos de esta Ubicación"}
-                        </button>
-
-                        {searchTerm.trim() && (
-                          <button
-                            onClick={() => {
-                              fetchVideos(searchTerm);
-                              setShowLocationPopup(false);
-                            }}
-                            disabled={loadingVideos}
-                            className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm font-medium shadow-md transition-all duration-200 disabled:opacity-50"
-                          >
-                            {loadingVideos
-                              ? "Buscando..."
-                              : `Buscar "${searchTerm}" aquí`}
-                          </button>
-                        )}
-
-                        <button
-                          onClick={() => setShowLocationPopup(false)}
-                          className="w-full bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg text-sm font-medium shadow-md transition-all duration-200"
-                        >
-                          Cerrar
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <p
-                        className={`text-gray-600 mb-2 ${
-                          isMobile ? "text-xs" : "text-sm"
-                        }`}
-                      >
-                        {clickedLocationName}
-                      </p>
-                      <p
-                        className={`text-gray-500 mb-3 ${
-                          isMobile ? "text-xs" : "text-xs"
-                        }`}
-                      >
-                        Haz clic en ciudades o lugares con nombre específico en
-                        el mapa.
-                      </p>
-                      <button
-                        onClick={() => setShowLocationPopup(false)}
-                        className="bg-gray-500 hover:bg-gray-600 text-white py-2 px-6 rounded-lg text-sm font-medium shadow-md transition-all duration-200"
-                      >
-                        Entendido
-                      </button>
-                    </>
-                  )}
-                </div>
-              </Popup>
-            )}
-
-            {userLocation && (
-              <Marker
-                latitude={userLocation.latitude}
-                longitude={userLocation.longitude}
-              >
-                <div className="relative">
-                  <div className="h-6 w-6 sm:h-8 sm:w-8 bg-gradient-to-r from-red-500 to-pink-500 border-2 border-white rounded-full animate-ping absolute"></div>
-                  <div className="h-4 w-4 sm:h-6 sm:w-6 bg-gradient-to-r from-red-500 to-pink-500 border-2 border-white rounded-full"></div>
-                </div>
-              </Marker>
-            )}
-
-            {searchLocation && (
-              <Marker
-                latitude={searchLocation.latitude}
-                longitude={searchLocation.longitude}
-              >
-                <div className="relative">
-                  <div className="h-6 w-6 sm:h-8 sm:w-8 bg-gradient-to-r from-yellow-500 to-orange-500 border-2 border-white rounded-full animate-ping absolute"></div>
-                  <div className="h-4 w-4 sm:h-6 sm:w-6 bg-gradient-to-r from-yellow-500 to-orange-500 border-2 border-white rounded-full"></div>
-                </div>
-              </Marker>
-            )}
-
-            {videos.map((video) => (
-              <Marker
-                key={video.youtube_video_id}
-                latitude={video.latitude}
-                longitude={video.longitude}
-              >
-                <div
-                  onClick={() => handleMarkerClick(video)}
-                  onDoubleClick={() => handleMarkerDoubleClick(video)}
-                  className="cursor-pointer text-2xl sm:text-3xl transform hover:scale-125 sm:hover:scale-150 transition-all duration-300"
-                  title="Click para vista previa, Doble click para ver completo"
-                >
-                  <div className="relative">
-                    <div
-                      className={`border-2 border-white rounded-full ${
-                        video.isSearchResult
-                          ? "bg-gradient-to-r from-yellow-500 to-orange-500"
-                          : "bg-gradient-to-r from-green-500 to-emerald-500"
-                      } ${isMobile ? "h-5 w-5" : "h-6 w-6"}`}
-                    ></div>
-                  </div>
-                </div>
-              </Marker>
-            ))}
-          </Map>
-
-          {/* Botones de control del mapa */}
-          <div
-            className={`absolute ${
-              isMobile
-                ? "bottom-4 right-4 left-4 flex justify-between"
-                : "bottom-6 right-6"
-            }`}
-          >
-            {/* Botón Mi Ubicación */}
-            <button
-              onClick={getUserLocation}
-              disabled={isAnimating}
-              className={`btn-success bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold rounded-2xl shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 ${
-                isMobile
-                  ? "px-4 py-3 text-sm flex items-center gap-2"
-                  : "px-6 py-3 text-lg"
-              }`}
-            >
-              {isAnimating ? (
-                <>
-                  <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
-                  {isMobile ? "Moviendo..." : "Moviendo..."}
-                </>
-              ) : (
-                <>
-                  <svg
-                    className={isMobile ? "w-4 h-4" : "w-5 h-5"}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                  </svg>
-                  {!isMobile && "Mi Ubicación"}
-                </>
-              )}
-            </button>
-
-            {/* Botón para mostrar/ocultar videos en móvil */}
-            {isMobile && (
-              <button
-                onClick={() => setShowSidebar(!showSidebar)}
-                className="toggle-videos-btn"
-              >
-                {showSidebar ? "⬇️ Ocultar Videos" : "⬆️ Mostrar Videos"}
-              </button>
-            )}
-          </div>
-
-          {isAnimating && (
-            <div className="absolute top-4 right-4 glass-effect bg-gray-800/80 px-3 py-2 rounded-lg">
-              <p className="text-sm text-cyan-400 flex items-center gap-2">
-                <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-cyan-400"></span>
-                Moviendo...
-              </p>
-            </div>
-          )}
-
-          {!youtubeAvailable && (
-            <div
-              className={`absolute glass-effect bg-red-500/20 border border-red-500/50 rounded-lg ${
-                isMobile
-                  ? "top-20 left-4 right-4 px-3 py-2"
-                  : "top-20 left-6 px-4 py-2"
-              }`}
-            >
-              <p className="text-sm text-red-300 flex items-center gap-2">
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
-                  />
-                </svg>
-                YouTube no disponible en {regionConfig[currentRegion]?.name}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Sidebar para escritorio */}
-        {!isMobile && showSidebar && (
-          <div className="w-1/3 p-6 bg-gradient-to-b from-slate-900 via-purple-900 to-blue-900 overflow-y-auto flex flex-col">
-            {/* ... (código del sidebar de escritorio existente) ... */}
-            <div className="text-center mb-6">
-              <h2 className="text-3xl font-bold bg-gradient-to-r from-yellow-400 via-red-400 to-pink-400 bg-clip-text text-transparent">
-                {getSidebarTitle()}
-              </h2>
-              <p className="text-cyan-300 text-sm mt-2">
-                {getSidebarSubtitle()}
-              </p>
-            </div>
-
-            {/* Resto del sidebar de escritorio... */}
-            {/* ... (mantener el código existente del sidebar) ... */}
-          </div>
-        )}
-
-        {/* Barra de videos móvil - NUEVO DISEÑO */}
-        {isMobile && showSidebar && (
-          <div className={`videos-container-mobile ${orientation} video-scrollbar`}>
-            {/* Header */}
-            <div className="videos-header">
-              <h3>{getSidebarTitle()}</h3>
-              <p>{getSidebarSubtitle()}</p>
-            </div>
-
-            {/* Categorías en móvil - SCROLL HORIZONTAL */}
-            <div className="px-4 py-3 border-b border-gray-700">
-              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                {categories.map((category) => {
-                  const hasValidLocation =
-                    (clickedLocation && isValidLocation) || userLocation;
-
-                  return (
-                    <button
-                      key={category.id}
-                      onClick={() => searchVideosByCategory(category)}
-                      disabled={!hasValidLocation}
-                      className={`flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-white transition-all duration-200 transform hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium flex-shrink-0 ${
-                        selectedCategory?.id === category.id
-                          ? `ring-1 ring-white ${category.bgColor}`
-                          : `bg-gradient-to-r ${category.color} hover:shadow-md`
-                      }`}
-                      title={
-                        hasValidLocation
-                          ? category.name
-                          : "Primero activa tu ubicación o selecciona una en el mapa"
-                      }
-                    >
-                      <span className="text-xs">{category.icon}</span>
-                      <span>{category.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Lista de videos */}
-            <div className="flex-1 overflow-y-auto py-2">
-              {videos.length > 0 ? (
-                videos.map((video) => (
-                  <div
-                    key={video.youtube_video_id}
-                    onClick={() => handleVideoClick(video)}
-                    onDoubleClick={() => handleVideoDoubleClick(video)}
-                    className="video-item-mobile"
-                    title="Toca para vista previa, Doble toque para ver completo"
-                  >
-                    <img
-                      src={video.thumbnail || `https://img.youtube.com/vi/${video.youtube_video_id}/mqdefault.jpg`}
-                      alt={video.title}
-                      className="video-thumbnail-mobile"
-                      onError={(e) => {
-                        e.target.src = "https://via.placeholder.com/120x90/1f2937/6b7280?text=Video";
-                      }}
-                    />
-                    <div className="video-content-mobile">
-                      <h4 className="video-title-mobile">{video.title}</h4>
-                      <p className="video-channel-mobile">{video.channelTitle}</p>
-                      <p className="video-views-mobile">
-                        {video.views.toLocaleString()} vistas
-                      </p>
-                      {video.confirmedLocation && (
-                        <div className="location-confirmed">
-                          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          <span>Ubicación confirmada</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                !loadingVideos && (
-                  <div className="no-videos-message">
-                    <p>No se encontraron videos</p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {userLocation || clickedLocation
-                        ? "Usa los botones para cargar videos"
-                        : "Activa tu ubicación o usa la búsqueda"}
-                    </p>
-                  </div>
-                )
-              )}
-              
-              {loadingVideos && (
-                <div className="loading-videos">
-                  <div className="loading-spinner"></div>
-                  <span>Cargando videos...</span>
-                </div>
-              )}
-
-              {hasMoreVideos && !loadingVideos && (
-                <div className="flex justify-center mt-4 mb-2">
-                  <button
-                    onClick={loadMoreVideos}
-                    disabled={isLoadingMore}
-                    className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-2 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg text-sm"
-                  >
-                    {isLoadingMore ? (
-                      <div className="flex items-center gap-2">
-                        <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></span>
-                        Cargando...
-                      </div>
-                    ) : (
-                      "Mostrar más videos"
-                    )}
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Sidebar de videos */}
+        <VideoSidebar
+          isMobile={isMobile}
+          showSidebar={showSidebar}
+          setShowSidebar={setShowSidebar}
+          getSidebarTitle={getSidebarTitle}
+          getSidebarSubtitle={getSidebarSubtitle}
+          categories={categories}
+          clickedLocation={clickedLocation}
+          isValidLocation={isValidLocation}
+          userLocation={userLocation}
+          searchVideosByCategory={searchVideosByCategory}
+          selectedCategory={selectedCategory}
+          selectedVideo={selectedVideo}
+          setSelectedVideo={setSelectedVideo}
+          handleWatchComplete={() => handleWatchComplete(user, selectedVideo, registerVideoAccess, clickedLocation, isValidLocation, clickedLocationName, searchLocation, navigate)}
+          videos={videos}
+          handleVideoClick={(video) => handleVideoClick(video, user, registerVideoAccess)}
+          handleVideoDoubleClick={(video) => handleVideoDoubleClick(video, user, registerVideoAccess, clickedLocation, isValidLocation, clickedLocationName, searchLocation, navigate)}
+          formatDuration={formatDuration}
+          hasMoreVideos={hasMoreVideos}
+          isLoadingMore={isLoadingMore}
+          loadMoreVideos={loadMoreVideos}
+          loadingVideos={loadingVideos}
+          activeFilter={activeFilter}
+          fetchOtherVideos={fetchOtherVideos}
+          fetchPopularVideos={fetchPopularVideos}
+          clickedLocationName={clickedLocationName}
+        />
       </div>
     </div>
   );
