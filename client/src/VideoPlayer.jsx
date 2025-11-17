@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import YouTube from 'react-youtube';
-import Map, { Marker, NavigationControl } from 'react-map-gl/mapbox'; // Removido Popup
+import Map, { Marker, NavigationControl } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import './styles/VideoPlayer.css';
 
 const VideoPlayer = () => {
   const { videoId } = useParams();
@@ -33,13 +34,12 @@ const VideoPlayer = () => {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [categoryClickCount, setCategoryClickCount] = useState(0);
 
-  // NUEVOS ESTADOS PARA EL BUSCADOR Y PAGINACIÓN
   const [searchTerm, setSearchTerm] = useState('');
   const [searchError, setSearchError] = useState('');
   const [nextPageToken, setNextPageToken] = useState('');
   const [hasMoreVideos, setHasMoreVideos] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [currentSearchType, setCurrentSearchType] = useState('related'); // 'related', 'category', 'search'
+  const [currentSearchType, setCurrentSearchType] = useState('related');
 
   const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
   const YOUTUBE_API_KEY = process.env.REACT_APP_YOUTUBE_API_KEY;
@@ -85,7 +85,6 @@ const VideoPlayer = () => {
   useEffect(() => {
     console.log('Location state recibido:', location.state);
     
-    // SOLO establecer ubicacion seleccionada si viene explicitamente del state
     if (location.state?.selectedLocation) {
       const { latitude, longitude, name } = location.state.selectedLocation;
       setSelectedLocation({ latitude, longitude });
@@ -98,13 +97,11 @@ const VideoPlayer = () => {
       });
       console.log('Ubicacion seleccionada establecida desde MainApp');
     } else {
-      // Limpiar ubicacion seleccionada si no viene del state
       setSelectedLocation(null);
       setSelectedLocationName('');
       console.log('No hay ubicacion seleccionada desde MainApp');
     }
 
-    // SIEMPRE cargar la ubicacion actual del usuario
     const savedUserLocation = localStorage.getItem('userLocation');
     if (savedUserLocation) {
       try {
@@ -117,7 +114,6 @@ const VideoPlayer = () => {
         
         console.log('Ubicacion actual del usuario cargada:', locationData);
         
-        // Si no hay ubicacion seleccionada, centrar en la ubicacion del usuario
         if (!location.state?.selectedLocation) {
           setViewport({
             latitude: locationData.latitude,
@@ -129,9 +125,6 @@ const VideoPlayer = () => {
         console.error('Error parsing user location:', error);
       }
     }
-
-    // NO usar localStorage como fallback para selectedLocation
-    // Solo usar lo que viene explicitamente del state de navegacion
   }, [location]);
 
   useEffect(() => {
@@ -276,7 +269,6 @@ const VideoPlayer = () => {
     return categories[categoryId] || 'Unknown Category';
   }, []);
 
-  // FUNCIÓN MODIFICADA PARA SOPORTAR PAGINACIÓN
   const fetchRelatedVideos = useCallback(async (currentVideoId, locationName, category = null, searchQuery = '', pageToken = '', isLoadMore = false) => {
     try {
       let finalSearchQuery = searchQuery;
@@ -331,19 +323,17 @@ const VideoPlayer = () => {
     }
   }, [YOUTUBE_API_KEY, fetchVideoStatistics]);
 
-  // NUEVA FUNCIÓN PARA BÚSQUEDA POR TÉRMINO
   const handleSearchSubmit = async (e) => {
     if (e) e.preventDefault();
     
     if (!searchTerm.trim()) {
-      setSearchError('Por favor ingresa un término de búsqueda válido.');
+      setSearchError('Por favor ingresa un termino de busqueda valido.');
       return;
     }
 
     setSearchError('');
     setLoading(true);
 
-    // Determinar ubicación para la búsqueda
     let locationName = 'Mexico';
     if (selectedLocationName) {
       locationName = selectedLocationName;
@@ -362,27 +352,25 @@ const VideoPlayer = () => {
         setHasMoreVideos(!!result.nextPageToken);
         setCurrentSearchType('search');
         setSelectedCategory(null);
-        console.log(`Búsqueda exitosa para "${searchTerm}" en ${locationName}`);
+        console.log(`Busqueda exitosa para "${searchTerm}" en ${locationName}`);
       } else {
         setSearchError(`No se encontraron videos para "${searchTerm}"`);
         setRelatedVideos([]);
       }
     } catch (error) {
-      console.error('Error en búsqueda:', error);
-      setSearchError('Error al realizar la búsqueda');
+      console.error('Error en busqueda:', error);
+      setSearchError('Error al realizar la busqueda');
     } finally {
       setLoading(false);
     }
   };
 
-  // NUEVA FUNCIÓN PARA CARGAR MÁS VIDEOS
   const loadMoreVideos = async () => {
     if (!nextPageToken || isLoadingMore) return;
 
     setIsLoadingMore(true);
 
     try {
-      // Determinar ubicación para la búsqueda
       let locationName = 'Mexico';
       if (selectedLocationName) {
         locationName = selectedLocationName;
@@ -409,7 +397,7 @@ const VideoPlayer = () => {
         setHasMoreVideos(!!result.nextPageToken);
       }
     } catch (error) {
-      console.error('Error cargando más videos:', error);
+      console.error('Error cargando mas videos:', error);
     } finally {
       setIsLoadingMore(false);
     }
@@ -439,9 +427,8 @@ const VideoPlayer = () => {
   const selectCategory = async (category) => {
     console.log(`Categoria seleccionada: ${category.name}`);
     setSelectedCategory(category);
-    setSearchTerm(''); // Limpiar búsqueda al seleccionar categoría
+    setSearchTerm('');
     
-    // Prioridad para la busqueda: ubicacion seleccionada -> ubicacion actual -> ubicacion del video -> Mexico
     let locationName = 'Mexico';
     if (selectedLocationName) {
       locationName = selectedLocationName;
@@ -463,7 +450,7 @@ const VideoPlayer = () => {
   const clearCategorySelection = async () => {
     console.log('Limpiando seleccion de categoria');
     setSelectedCategory(null);
-    setSearchTerm(''); // Limpiar búsqueda
+    setSearchTerm('');
     
     let locationName = 'Mexico';
     if (selectedLocationName) {
@@ -509,7 +496,6 @@ const VideoPlayer = () => {
               setVideoLocationName(locationCoords.name);
               setShowVideoLocation(true);
               
-              // Solo centrar en ubicacion del video si no hay ubicacion seleccionada NI ubicacion actual
               if (!selectedLocation && !userLocation) {
                 setViewport({
                   latitude: locationCoords.latitude,
@@ -521,7 +507,6 @@ const VideoPlayer = () => {
           }
         }
 
-        // Determinar ubicacion para busqueda de videos relacionados
         let locationName = 'Mexico';
         if (selectedLocationName) {
           locationName = selectedLocationName;
@@ -642,49 +627,41 @@ const VideoPlayer = () => {
       <header className="glass-effect border-b border-gray-700 p-4 bg-gray-800/80 backdrop-blur-sm">
         <div className="container mx-auto">
           <div className="flex items-center justify-between mb-4">
-            <div 
-              onClick={handleBackToMap}
-              className="cursor-pointer group"
-            >
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent group-hover:from-cyan-300 group-hover:to-blue-400 transition-all duration-300">
+            {/* ✅ CORRECCIÓN: Título en contenedor separado sin overflow-hidden */}
+            <div className="header-titulo">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
                 VideoMap Pro
               </h1>
               <p className="text-sm text-gray-400">Reproductor de Video</p>
               {selectedCategory && (
-                <p className="text-sm text-green-400 mt-1">
+                <p className="text-sm text-green-400 mt-1 busqueda-texto-largo">
                   Filtrado por: {selectedCategory.name}
-                </p>
-              )}
-              {searchTerm && (
-                <p className="text-sm text-yellow-400 mt-1">
-                  Buscando: "{searchTerm}"
                 </p>
               )}
             </div>
             
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-shrink-0">
               {userLocationName && (
-                <div className="text-right">
+                <div className="text-right flex-shrink-0">
                   <p className="text-sm text-cyan-400">Ubicacion actual</p>
                   <p className="text-xs text-gray-300">{userLocationName}</p>
                 </div>
               )}
               <button 
                 onClick={handleBackToMap}
-                className="bg-gradient-to-r from-gray-700 to-gray-600 px-6 py-2 rounded-lg hover:from-gray-600 hover:to-gray-500 transition-all duration-300 border border-gray-600 hover:border-gray-500"
+                className="bg-gradient-to-r from-gray-700 to-gray-600 px-6 py-2 rounded-lg hover:from-gray-600 hover:to-gray-500 transition-all duration-300 border border-gray-600 hover:border-gray-500 flex-shrink-0"
               >
                 Volver al Mapa
               </button>
             </div>
           </div>
 
-          {/* BUSCADOR - AGREGADO ARRIBA DE LAS CATEGORÍAS */}
           <div className="mb-4">
             <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
               <div className="flex-1 relative">
                 <input
                   type="text"
-                  placeholder="Buscar términos relacionados..."
+                  placeholder="Buscar terminos relacionados..."
                   value={searchTerm}
                   onChange={(e) => {
                     setSearchTerm(e.target.value);
@@ -712,16 +689,10 @@ const VideoPlayer = () => {
                 {searchError}
               </div>
             )}
-            
-            {searchTerm && (
-              <div className="mt-2 text-sm text-gray-400">
-                Buscando "{searchTerm}" en {selectedLocationName || userLocationName || videoLocationName || 'México'}
-              </div>
-            )}
           </div>
 
           <div className="flex justify-center">
-            <div className="grid grid-cols-5 gap-2 w-full max-w-4xl">
+            <div className="categorias-grid w-full max-w-full px-2">
               {categories.map((category) => (
                 <div
                   key={category.id}
@@ -734,7 +705,7 @@ const VideoPlayer = () => {
                   }`}
                   title={`Click: Filtrar por ${category.name}\nDoble Click: Quitar filtro`}
                 >
-                  <span className="text-white text-sm font-medium whitespace-nowrap">
+                  <span className="text-white text-sm font-medium text-center whitespace-normal break-words">
                     {category.name}
                     {selectedCategory?.id === category.id && ' ✓'}
                   </span>
@@ -753,35 +724,30 @@ const VideoPlayer = () => {
                 <h2 className="text-xl font-semibold text-cyan-400">Reproduciendo Video</h2>
                 <div className="flex flex-wrap gap-4 mt-2">
                   {showVideoLocation && (
-                    <p className="text-sm text-green-400 flex items-center gap-2">
-                      <span>📍</span>
+                    <p className="text-sm text-green-400 flex items-center gap-2 busqueda-texto-largo">
                       <span>Ubicacion del video: {videoLocationName}</span>
                     </p>
                   )}
                   {selectedLocationName && (
-                    <p className="text-sm text-yellow-400 flex items-center gap-2">
+                    <p className="text-sm text-yellow-400 flex items-center gap-2 busqueda-texto-largo">
                       <span>Ubicacion seleccionada: {selectedLocationName}</span>
                     </p>
                   )}
                   {userLocationName && (
-                    <p className="text-sm text-blue-400 flex items-center gap-2">
+                    <p className="text-sm text-blue-400 flex items-center gap-2 busqueda-texto-largo">
                       <span>Mi ubicacion: {userLocationName}</span>
                     </p>
                   )}
                   {selectedCategory && (
-                    <p className="text-sm text-purple-400 flex items-center gap-2">
+                    <p className="text-sm text-purple-400 flex items-center gap-2 busqueda-texto-largo">
                       <span>Categoria: {selectedCategory.name}</span>
-                    </p>
-                  )}
-                  {searchTerm && (
-                    <p className="text-sm text-yellow-400 flex items-center gap-2">
-                      <span>🔍</span>
-                      <span>Buscando: "{searchTerm}"</span>
                     </p>
                   )}
                 </div>
               </div>
-              <div className="bg-black">
+              
+              {/* ✅ CORRECCIÓN: Eliminado bg-black y usando video-container */}
+              <div className="video-container">
                 <YouTube videoId={videoId} opts={youtubeOpts} />
               </div>
             </div>
@@ -821,7 +787,6 @@ const VideoPlayer = () => {
                 )}
               </div>
 
-              {/* SOLO mostrar ubicacion seleccionada si realmente existe */}
               {selectedLocationName && (
                 <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-xl p-4 mb-6 border border-yellow-500/30">
                   <h3 className="font-semibold mb-3 text-yellow-400 text-lg flex items-center gap-2">
@@ -956,13 +921,8 @@ const VideoPlayer = () => {
                   Mapa de Ubicaciones
                 </h3>
                 {selectedCategory && (
-                  <p className="text-sm text-purple-400 mt-1">
+                  <p className="text-sm text-purple-400 mt-1 busqueda-texto-largo">
                     Filtrado por: {selectedCategory.name}
-                  </p>
-                )}
-                {searchTerm && (
-                  <p className="text-sm text-yellow-400 mt-1">
-                    Buscando: "{searchTerm}"
                   </p>
                 )}
               </div>
@@ -976,7 +936,6 @@ const VideoPlayer = () => {
                 >
                   <NavigationControl position="top-right" />
                   
-                  {/* SOLO mostrar ubicacion seleccionada si existe */}
                   {selectedLocation && (
                     <Marker
                       latitude={selectedLocation.latitude}
@@ -1011,7 +970,6 @@ const VideoPlayer = () => {
                     </Marker>
                   )}
                   
-                  {/* SIEMPRE mostrar ubicacion actual si existe */}
                   {userLocation && (
                     <Marker
                       latitude={userLocation.latitude}
@@ -1031,7 +989,6 @@ const VideoPlayer = () => {
               </div>
               <div className="p-4 border-t border-gray-700">
                 <div className="space-y-2">
-                  {/* SOLO mostrar ubicacion seleccionada si existe */}
                   {selectedLocation && (
                     <div className="flex items-center gap-2">
                       <div className="h-3 w-3 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full animate-pulse"></div>
@@ -1046,7 +1003,6 @@ const VideoPlayer = () => {
                     </div>
                   )}
                   
-                  {/* SIEMPRE mostrar ubicacion actual si existe */}
                   {userLocation && (
                     <div className="flex items-center gap-2">
                       <div className="h-3 w-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"></div>
@@ -1070,28 +1026,23 @@ const VideoPlayer = () => {
                     {selectedCategory 
                       ? `Videos de ${selectedCategory.name}` 
                       : searchTerm 
-                        ? `Resultados: "${searchTerm}"` 
+                        ? `Resultados:` 
                         : 'Videos Relacionados'
                     }
                   </h3>
                   {(selectedCategory || searchTerm) && (
                     <button
                       onClick={clearCategorySelection}
-                      className="text-xs bg-red-500 hover:bg-red-600 px-2 py-1 rounded text-white transition-colors"
+                      className="text-xs bg-red-500 hover:bg-red-600 px-2 py-1 rounded text-white transition-colors flex-shrink-0"
                       title="Quitar filtro"
                     >
-                      ✕
+                      X
                     </button>
                   )}
                 </div>
                 {selectedCategory && (
-                  <p className="text-sm text-purple-400 mt-1">
+                  <p className="text-sm text-purple-400 mt-1 busqueda-texto-largo">
                     Mostrando contenido de {selectedCategory.name.toLowerCase()}
-                  </p>
-                )}
-                {searchTerm && (
-                  <p className="text-sm text-yellow-400 mt-1">
-                    Buscando en {selectedLocationName || userLocationName || videoLocationName || 'México'}
                   </p>
                 )}
               </div>
@@ -1143,7 +1094,6 @@ const VideoPlayer = () => {
                       </div>
                     ))}
                     
-                    {/* BOTÓN MOSTRAR MÁS VIDEOS - AGREGADO */}
                     {hasMoreVideos && (
                       <div className="flex justify-center mt-4 mb-4">
                         <button
@@ -1157,7 +1107,7 @@ const VideoPlayer = () => {
                               Cargando...
                             </div>
                           ) : (
-                            'Mostrar más videos'
+                            'Mostrar mas videos'
                           )}
                         </button>
                       </div>
