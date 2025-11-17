@@ -1,0 +1,1316 @@
+/* MainApp.css - Estilos responsivos para móvil */
+
+/* ===== ESTILOS PARA LA BARRA DE VIDEOS EN MÓVIL ===== */
+
+/* Contenedor principal de videos en móvil */
+.video-scrollbar {
+  transition: all 0.3s ease-in-out;
+}
+
+/* En modo vertical - Scroll vertical */
+@media (max-width: 1023px) and (orientation: portrait) {
+  .video-scrollbar {
+    display: flex !important;
+    flex-direction: column !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    height: 45vh !important;
+    padding: 0.75rem;
+  }
+  
+  .map-container-with-videos {
+    height: 55vh !important;
+  }
+}
+
+/* En modo horizontal - Galería horizontal */
+@media (max-width: 1023px) and (orientation: landscape) {
+  .video-scrollbar {
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    height: 35vh !important;
+    padding: 0.5rem;
+    gap: 0.75rem;
+  }
+  
+  .video-scrollbar > div {
+    flex: 0 0 auto;
+    width: 280px;
+    min-width: 280px;
+  }
+  
+  .map-container-with-videos {
+    height: 65vh !important;
+  }
+}
+
+/* ===== ESTILOS PARA EL MAPA ===== */
+
+/* Ocultar controles de navegación en móvil */
+@media (max-width: 1023px) {
+  .mapboxgl-ctrl-top-right {
+    display: none !important;
+  }
+  
+  .mapboxgl-map {
+    width: 100% !important;
+    height: 100% !important;
+  }
+}
+
+/* Reposicionar logo de Mapbox */
+.mapboxgl-ctrl-logo {
+  bottom: 8px !important;
+  right: 8px !important;
+  top: auto !important;
+  left: auto !important;
+  z-index: 10;
+}
+
+/* Ocultar atribución en móvil */
+@media (max-width: 1023px) {
+  .mapboxgl-ctrl-attrib {
+    display: none !important;
+  }
+}
+
+/* ===== BARRA DE VIDEOS MEJORADA ===== */
+
+.videos-container-mobile {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(17, 24, 39, 0.95);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(55, 65, 81, 0.8);
+  border-radius: 24px 24px 0 0;
+  overflow-y: auto;
+  transition: all 0.3s ease-in-out;
+  z-index: 40;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.videos-container-mobile.portrait {
+  height: 45vh;
+}
+
+.videos-container-mobile.landscape {
+  height: 40vh;
+  flex-direction: row !important;
+}
+
+/* Header de la barra de videos */
+.videos-header {
+  padding: 1rem 1rem 0.5rem;
+  border-bottom: 1px solid rgba(55, 65, 81, 0.5);
+  background: linear-gradient(135deg, rgba(6, 78, 59, 0.3), rgba(13, 148, 136, 0.2));
+  border-radius: 24px 24px 0 0;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.videos-header h3 {
+  font-weight: 700;
+  background: linear-gradient(135deg, #10b981, #06b6d4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0;
+  font-size: 1.1rem;
+  text-align: center;
+}
+
+.videos-header p {
+  color: #9ca3af;
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+/* Items de video optimizados para móvil */
+.video-item-mobile {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  margin: 0.5rem 0.75rem;
+  background: rgba(31, 41, 55, 0.6);
+  border: 1px solid rgba(55, 65, 81, 0.8);
+  border-radius: 12px;
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+}
+
+.video-item-mobile:active {
+  transform: scale(0.98);
+  background: rgba(6, 78, 59, 0.3);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.video-item-mobile:hover {
+  background: rgba(6, 78, 59, 0.2);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.video-thumbnail-mobile {
+  width: 80px;
+  height: 60px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.video-content-mobile {
+  flex: 1;
+  min-width: 0;
+}
+
+.video-title-mobile {
+  font-weight: 600;
+  color: white;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  margin-bottom: 0.25rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.video-channel-mobile {
+  color: #9ca3af;
+  font-size: 0.7rem;
+  margin-bottom: 0.25rem;
+}
+
+.video-views-mobile {
+  color: #fbbf24;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+/* Indicador de ubicación confirmada */
+.location-confirmed {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.location-confirmed svg {
+  width: 12px;
+  height: 12px;
+  color: #10b981;
+}
+
+.location-confirmed span {
+  color: #10b981;
+  font-size: 0.65rem;
+  font-weight: 500;
+}
+
+/* ===== BOTÓN TOGGLE VIDEOS ===== */
+
+.toggle-videos-btn {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #10b981, #06b6d4);
+  border: none;
+  border-radius: 20px 20px 0 0;
+  padding: 0.5rem 1.5rem;
+  color: white;
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+  z-index: 45;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+  min-height: 44px;
+}
+
+.toggle-videos-btn:active {
+  transform: translateX(-50%) scale(0.95);
+}
+
+/* ===== SCROLLBAR PERSONALIZADO ===== */
+
+.videos-container-mobile::-webkit-scrollbar {
+  width: 6px;
+}
+
+.videos-container-mobile::-webkit-scrollbar-track {
+  background: rgba(31, 41, 55, 0.3);
+  border-radius: 3px;
+}
+
+.videos-container-mobile::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #10b981, #06b6d4);
+  border-radius: 3px;
+}
+
+.videos-container-mobile::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #059669, #0891b2);
+}
+
+/* ===== ORIENTACIÓN ===== */
+
+.orientation-portrait .map-container {
+  height: 55vh !important;
+}
+
+.orientation-portrait .videos-container {
+  height: 45vh !important;
+}
+
+.orientation-landscape .map-container {
+  height: 60vh !important;
+}
+
+.orientation-landscape .videos-container {
+  height: 40vh !important;
+  flex-direction: row !important;
+}
+
+.orientation-landscape .video-item-mobile {
+  flex-direction: column;
+  text-align: center;
+  min-width: 200px;
+}
+
+.orientation-landscape .video-thumbnail-mobile {
+  width: 100%;
+  height: 100px;
+}
+
+/* ===== MEJORAS TÁCTILES ===== */
+
+@media (max-width: 1023px) {
+  button, 
+  .video-item-mobile,
+  .mapboxgl-marker {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+  
+  .videos-container-mobile {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ===== ANIMACIONES ===== */
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+
+.videos-container-mobile.slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+.videos-container-mobile.slide-down {
+  animation: slideDown 0.3s ease-in;
+}
+
+/* ===== ESTADOS DE CARGA ===== */
+
+.loading-videos {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: #9ca3af;
+  font-size: 0.875rem;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #374151;
+  border-top: 3px solid #10b981;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.no-videos-message {
+  text-align: center;
+  padding: 2rem;
+  color: #9ca3af;
+}
+
+.no-videos-message p {
+  margin: 0.5rem 0;
+}
+
+/* ===== RESPONSIVE ADICIONAL ===== */
+
+/* Tablets pequeñas */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .videos-container-mobile.portrait {
+    height: 40vh;
+  }
+  
+  .videos-container-mobile.landscape {
+    height: 35vh;
+  }
+  
+  .video-thumbnail-mobile {
+    width: 100px;
+    height: 75px;
+  }
+}
+
+/* Teléfonos muy pequeños */
+@media (max-width: 360px) {
+  .video-item-mobile {
+    padding: 0.5rem;
+    gap: 0.5rem;
+  }
+  
+  .video-thumbnail-mobile {
+    width: 70px;
+    height: 52px;
+  }
+  
+  .video-title-mobile {
+    font-size: 0.75rem;
+  }
+  
+  .video-channel-mobile,
+  .video-views-mobile {
+    font-size: 0.65rem;
+  }
+  
+  .videos-header h3 {
+    font-size: 1rem;
+  }
+  
+  .videos-header p {
+    font-size: 0.75rem;
+  }
+}
+
+/* Asegurar que los modales sean responsivos */
+@media (max-width: 1023px) {
+  .modal-content {
+    margin: 1rem;
+    max-height: 80vh;
+  }
+}
+
+/* Mejoras para el mapa en móvil */
+.mobile-map-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* ===== BOTÓN DE UBICACIÓN MEJORADO ===== */
+
+/* 📍 Reubicar botón de ubicación */
+.mobile-map-controls {
+  position: absolute;
+  top: 4.5rem; /* ahora está arriba del mapa */
+  right: 1rem;
+  left: auto;
+  bottom: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
+  z-index: 20;
+}
+
+/* Ajuste del botón de ubicación */
+.mobile-map-controls .location-btn {
+  background: linear-gradient(135deg, #10b981, #06b6d4);
+  color: white;
+  border: none;
+  padding: 0.75rem;
+  border-radius: 50%;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+/* ===== BUSCADOR RESPONSIVO ===== */
+
+/* 🔍 Ajuste del buscador en móvil */
+@media (max-width: 768px) {
+  .search-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 95%;
+    margin: 0 auto;
+    padding: 0.5rem;
+  }
+
+  .search-container input[type="text"],
+  .search-container input {
+    width: 100%;
+    font-size: 1rem;
+    padding: 0.6rem 0.8rem;
+    border-radius: 10px;
+  }
+
+  .search-container button,
+  .search-icon,
+  .profile-icon {
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 1.2rem;
+    border-radius: 10px;
+  }
+
+  /* Hace que los íconos no se salgan del contenedor */
+  .search-icon,
+  .profile-icon {
+    flex-shrink: 0;
+  }
+}
+
+/* ===📱 AJUSTES GLOBALES EN MÓVIL=== */
+@media (max-width: 768px) {
+
+  /* --- Barra superior (VideoMap + buscador + perfil) --- */
+  .navbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.4rem 0.8rem;
+    width: 100%;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(55, 65, 81, 0.4);
+  }
+
+  .search-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+    width: 100%;
+    padding: 0.4rem 0;
+  }
+
+  .search-container input[type="text"],
+  .search-container input {
+    flex: 1;
+    font-size: 0.95rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: 10px;
+    border: none;
+    outline: none;
+    color: #f3f4f6;
+    background: rgba(30, 41, 59, 0.9);
+    min-height: 44px;
+  }
+
+  .search-container input::placeholder {
+    color: #9ca3af;
+  }
+
+  .search-icon,
+  .profile-icon {
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #4f46e5, #06b6d4);
+    color: white;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+  }
+
+  /* --- Contenedor de controles del mapa --- */
+  .mobile-map-controls {
+    position: absolute;
+    top: 4.2rem; /* justo debajo del buscador */
+    right: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.75rem;
+    z-index: 50;
+  }
+
+  /* --- Botón Mi ubicación --- */
+  .location-btn {
+    background: linear-gradient(135deg, #10b981, #06b6d4);
+    color: white;
+    border: none;
+    padding: 0.8rem;
+    border-radius: 50%;
+    font-size: 1.3rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    transition: transform 0.15s ease;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .location-btn:active {
+    transform: scale(0.9);
+  }
+
+  /* --- Botón Mostrar Videos --- */
+  .toggle-videos-btn-mobile {
+    background: linear-gradient(135deg, #06b6d4, #0ea5e9);
+    color: white;
+    font-weight: 600;
+    border: none;
+    border-radius: 14px;
+    padding: 0.55rem 1.1rem;
+    font-size: 0.9rem;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+    min-height: 44px;
+    transition: all 0.2s ease-in-out;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .toggle-videos-btn-mobile:active {
+    transform: scale(0.95);
+  }
+
+  /* --- Mejoras en título de videos y lista --- */
+  .videos-header h3 {
+    font-size: 1rem;
+  }
+
+  .videos-container-mobile {
+    border-radius: 20px 20px 0 0;
+    backdrop-filter: blur(15px);
+  }
+
+  .video-item-mobile {
+    border-radius: 12px;
+  }
+
+  /* --- Ajustes específicos para la navbar --- */
+  .navbar > div:first-child {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .navbar > div:last-child {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  /* --- Asegurar que el buscador ocupe el espacio correcto --- */
+  .search-container form {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .search-container .relative {
+    flex: 1;
+  }
+
+  /* --- Ajustes para el input de búsqueda cuando está expandido --- */
+  .search-container input {
+    width: 100% !important;
+  }
+}
+
+/* Estilos para el modo horizontal específico */
+@media (max-width: 1023px) and (orientation: landscape) {
+  .videos-container-mobile {
+    flex-wrap: nowrap;
+    padding: 0.5rem;
+  }
+  
+  .video-item-mobile {
+    margin: 0 0.25rem;
+    min-width: 220px;
+  }
+  
+  .videos-header {
+    position: static;
+  }
+}
+
+/* Prevenir desbordamientos */
+* {
+  box-sizing: border-box;
+}
+
+/* Mejoras de rendimiento para móvil */
+@media (max-width: 1023px) {
+  .mapboxgl-canvas {
+    transform: translateZ(0);
+  }
+}
+
+/* ===== CONTROLES MÓVILES - ESTRUCTURA CORREGIDA ===== */
+
+.mobile-controls-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.mobile-top-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  pointer-events: auto;
+}
+
+.mobile-bottom-controls {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  width: auto;
+}
+
+/* Botón de ubicación móvil */
+.location-btn-mobile {
+  background: linear-gradient(135deg, #10b981, #059669);
+  border: 2px solid white;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.location-btn-mobile:active {
+  transform: scale(0.95);
+  background: linear-gradient(135deg, #059669, #047857);
+}
+
+/* Botón de mostrar videos móvil */
+.toggle-videos-btn-mobile {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  color: white;
+  border: none;
+  border-radius: 25px;
+  padding: 12px 24px;
+  font-weight: 600;
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+  min-width: 160px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toggle-videos-btn-mobile:active {
+  transform: scale(0.95);
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+}
+
+/* Asegurar que los controles no interfieran con el mapa */
+.mobile-map-container {
+  position: relative;
+}
+
+.mobile-map-container .mapboxgl-canvas-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+/* Estilos para el contenedor de videos en móvil */
+.videos-container-mobile {
+  background: linear-gradient(to bottom, #1e293b, #374151);
+  border-top: 2px solid #4b5563;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.videos-container-mobile.portrait {
+  height: 45vh;
+}
+
+.videos-container-mobile.landscape {
+  height: 40vh;
+}
+
+.videos-header {
+  padding: 16px;
+  background: linear-gradient(to right, #1e40af, #7c3aed);
+  text-align: center;
+  border-bottom: 1px solid #4b5563;
+  position: relative;
+}
+
+.videos-header h3 {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 4px;
+  color: white;
+}
+
+.videos-header p {
+  font-size: 12px;
+  color: #d1d5db;
+}
+
+/* Botón de cerrar en el header */
+.videos-header .close-button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.9);
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.videos-header .close-button:hover {
+  background: rgba(239, 68, 68, 1);
+  transform: scale(1.1);
+}
+
+.videos-header .close-button:active {
+  transform: scale(0.95);
+}
+
+/* Scrollbar personalizado para videos */
+.video-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.video-scrollbar::-webkit-scrollbar-track {
+  background: #374151;
+  border-radius: 3px;
+}
+
+.video-scrollbar::-webkit-scrollbar-thumb {
+  background: #6b7280;
+  border-radius: 3px;
+}
+
+.video-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Ocultar scrollbar en algunos navegadores */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Items de video en móvil */
+.video-item-mobile {
+  display: flex;
+  padding: 12px;
+  border-bottom: 1px solid #4b5563;
+  background: #374151;
+  transition: background-color 0.2s ease;
+}
+
+.video-item-mobile:active {
+  background: #4b5563;
+}
+
+.video-thumbnail-mobile {
+  width: 120px;
+  height: 90px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.video-content-mobile {
+  flex: 1;
+  margin-left: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.video-title-mobile {
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.video-channel-mobile {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-bottom: 4px;
+}
+
+.video-views-mobile {
+  font-size: 11px;
+  color: #fbbf24;
+}
+
+.location-confirmed {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.location-confirmed svg {
+  width: 12px;
+  height: 12px;
+  color: #10b981;
+}
+
+.location-confirmed span {
+  font-size: 10px;
+  color: #10b981;
+}
+
+/* Mensaje cuando no hay videos */
+.no-videos-message {
+  text-align: center;
+  padding: 40px 20px;
+  color: #9ca3af;
+}
+
+/* Loading state */
+.loading-videos {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  color: #6b7280;
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #6b7280;
+  border-top: 2px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: 8px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Ajustes para el mapa cuando hay videos visibles */
+.map-container-with-videos {
+  height: 55vh !important;
+  transition: height 0.3s ease;
+}
+
+/* Asegurar que el contenedor de videos móvil se muestre correctamente */
+.videos-container-mobile {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* ===== ESTILOS ADICIONALES PARA MEJOR EXPERIENCIA MÓVIL ===== */
+
+/* Mejoras para el navbar en móvil */
+@media (max-width: 768px) {
+  .navbar {
+    min-height: 60px;
+    padding: 0.5rem 1rem;
+  }
+  
+  .navbar h1 {
+    font-size: 1.3rem !important;
+    white-space: nowrap;
+  }
+}
+
+/* Mejoras para los botones táctiles */
+@media (max-width: 1023px) {
+  .btn-primary,
+  .btn-secondary,
+  .btn-success {
+    min-height: 44px;
+    min-width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    border-radius: 12px;
+  }
+}
+
+/* Ajustes para el modal en móvil */
+@media (max-width: 768px) {
+  .modal-overlay {
+    padding: 1rem;
+    align-items: flex-end;
+  }
+  
+  .modal-content {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    border-radius: 20px 20px 0 0;
+    max-height: 85vh;
+  }
+}
+
+/* Mejoras de accesibilidad */
+@media (max-width: 1023px) {
+  .video-item-mobile:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+  }
+  
+  button:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+  }
+}
+
+/* Optimizaciones de rendimiento */
+@media (max-width: 1023px) {
+  .videos-container-mobile {
+    will-change: transform;
+    transform: translateZ(0);
+  }
+  
+  .mobile-controls-container {
+    transform: translateZ(0);
+  }
+}
+
+/* Correcciones para Safari iOS */
+@supports (-webkit-touch-callout: none) {
+  .videos-container-mobile {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .mobile-map-container {
+    -webkit-transform: translateZ(0);
+  }
+}
+
+/* Estilos para el estado de carga global */
+.global-loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(10px);
+}
+
+.global-loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #374151;
+  border-top: 4px solid #10b981;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Estilos para mensajes de error */
+.error-message {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin: 0.5rem 0;
+  font-size: 0.875rem;
+}
+
+.success-message {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #6ee7b7;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin: 0.5rem 0;
+  font-size: 0.875rem;
+}
+
+/* Estilos para glass effect mejorado */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+}
+
+/* Mejoras para el modo oscuro */
+@media (prefers-color-scheme: dark) {
+  .videos-container-mobile {
+    background: rgba(15, 23, 42, 0.95);
+  }
+  
+  .video-item-mobile {
+    background: rgba(30, 41, 59, 0.8);
+  }
+}
+
+/* Estilos para el botón de cerrar en móvil */
+.close-button-mobile {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.9);
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  z-index: 50;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.close-button-mobile:hover {
+  background: rgba(239, 68, 68, 1);
+  transform: scale(1.1);
+}
+
+.close-button-mobile:active {
+  transform: scale(0.95);
+}
+
+/* Estilos para el overlay de mapa en móvil */
+.map-overlay-mobile {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+  backdrop-filter: blur(5px);
+}
+
+/* Ajustes finales para una experiencia móvil perfecta */
+@media (max-width: 1023px) {
+  body {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  
+  input, textarea {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}
+
+/* ===== CORRECCIONES ESPECÍFICAS PARA EL BOTÓN DE CERRAR ===== */
+
+/* Botón de cerrar en el header de videos móvil */
+.videos-header .close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.9);
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.videos-header .close-btn:hover {
+  background: rgba(239, 68, 68, 1);
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.videos-header .close-btn:active {
+  transform: scale(0.95);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Asegurar que el header tenga posición relativa para el botón de cerrar */
+.videos-header {
+  position: relative;
+  padding-right: 60px; /* Espacio para el botón de cerrar */
+}
+
+/* Responsive para el botón de cerrar */
+@media (max-width: 360px) {
+  .videos-header .close-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+    top: 10px;
+    right: 10px;
+  }
+  
+  .videos-header {
+    padding-right: 50px;
+  }
+}
+
+/* Efecto de pulso para el botón de cerrar */
+@keyframes pulse-red {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+.videos-header .close-btn.pulse {
+  animation: pulse-red 2s infinite;
+}
+
+/* Estados de hover mejorados para móvil */
+@media (hover: hover) {
+  .videos-header .close-btn:hover {
+    background: rgba(220, 38, 38, 1);
+    transform: scale(1.15);
+  }
+}
+
+/* Ajustes para el botón de cerrar en modo landscape */
+@media (max-width: 1023px) and (orientation: landscape) {
+  .videos-header .close-btn {
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+  
+  .videos-header {
+    padding-right: 45px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+}
+
+/* Mejoras de accesibilidad para el botón de cerrar */
+.videos-header .close-btn:focus {
+  outline: 3px solid rgba(59, 130, 246, 0.5);
+  outline-offset: 2px;
+}
+
+/* Transición suave para todos los elementos interactivos */
+.video-item-mobile,
+.toggle-videos-btn-mobile,
+.location-btn-mobile,
+.videos-header .close-btn {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Mejoras de rendimiento para animaciones */
+@media (prefers-reduced-motion: reduce) {
+  .video-item-mobile,
+  .toggle-videos-btn-mobile,
+  .location-btn-mobile,
+  .videos-header .close-btn {
+    transition: none;
+  }
+  
+  .videos-container-mobile.slide-up,
+  .videos-container-mobile.slide-down {
+    animation: none;
+  }
+}

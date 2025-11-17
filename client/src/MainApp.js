@@ -13,7 +13,7 @@ import AuthModal from "./components/models/AuthModal";
 import ChangePasswordModal from "./components/models/ChangePasswordModal";
 import ChangePhotoModal from "./components/models/ChangePhotoModal";
 import CommentsModal from "./components/models/CommentsModal";
-import "./MainApp.css";
+import "./styles/MainApp.css";
 
 const MainApp = () => {
   // Estados principales
@@ -74,44 +74,6 @@ const MainApp = () => {
   const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
   const YOUTUBE_API_KEY = process.env.REACT_APP_YOUTUBE_API_KEY;
   const API_BASE_URL = process.env.REACT_APP_API_URL;
-
-  // Efecto para detectar tamaño de pantalla y orientación
-  useEffect(() => {
-    const checkMobileAndOrientation = () => {
-      if (typeof window === "undefined") return;
-      
-      const width = window.innerWidth || 1024;
-      const isMobileDetected = width < 1024;
-      const isLandscape = width > window.innerHeight;
-
-      setIsMobile(isMobileDetected);
-      setOrientation(isLandscape ? 'landscape' : 'portrait');
-
-      // Actualizar clases del body para CSS
-      document.body.classList.toggle('orientation-landscape', isLandscape);
-      document.body.classList.toggle('orientation-portrait', !isLandscape);
-
-      if (width >= 1024) {
-        setShowSidebar(true);
-        setShowSearchBar(false);
-      } else {
-        setShowSidebar(false);
-      }
-    };
-
-    if (typeof window !== "undefined") {
-      checkMobileAndOrientation();
-      window.addEventListener("resize", checkMobileAndOrientation);
-      window.addEventListener("orientationchange", checkMobileAndOrientation);
-    }
-
-    return () => {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("resize", checkMobileAndOrientation);
-        window.removeEventListener("orientationchange", checkMobileAndOrientation);
-      }
-    };
-  }, []);
 
   // PAÍSES Y CIUDADES RESTRINGIDAS
   const restrictedCountries = useMemo(
@@ -218,6 +180,44 @@ const MainApp = () => {
     ],
     []
   );
+
+  // Efecto para detectar tamaño de pantalla y orientación
+  useEffect(() => {
+    const checkMobileAndOrientation = () => {
+      if (typeof window === "undefined") return;
+      
+      const width = window.innerWidth || 1024;
+      const isMobileDetected = width < 1024;
+      const isLandscape = width > window.innerHeight;
+
+      setIsMobile(isMobileDetected);
+      setOrientation(isLandscape ? 'landscape' : 'portrait');
+
+      // Actualizar clases del body para CSS
+      document.body.classList.toggle('orientation-landscape', isLandscape);
+      document.body.classList.toggle('orientation-portrait', !isLandscape);
+
+      if (width >= 1024) {
+        setShowSidebar(true);
+        setShowSearchBar(false);
+      } else {
+        setShowSidebar(false);
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      checkMobileAndOrientation();
+      window.addEventListener("resize", checkMobileAndOrientation);
+      window.addEventListener("orientationchange", checkMobileAndOrientation);
+    }
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("resize", checkMobileAndOrientation);
+        window.removeEventListener("orientationchange", checkMobileAndOrientation);
+      }
+    };
+  }, []);
 
   // Función para validar tipo de ubicación
   const isValidLocationType = useCallback((feature) => {
@@ -383,7 +383,7 @@ const MainApp = () => {
     async (latitude, longitude, locationName, query = "", pageToken = "") => {
       try {
         const searchQuery = query || locationName.split(",")[0].trim();
-        console.log("🎯 Buscando en YouTube para ubicación:", {
+        console.log("Buscando en YouTube para ubicación:", {
           query: searchQuery,
           location: locationName,
           coordinates: { latitude, longitude },
@@ -409,7 +409,7 @@ const MainApp = () => {
           url += `&pageToken=${pageToken}`;
         }
 
-        console.log("📡 URL de búsqueda YouTube:", url);
+        console.log("URL de búsqueda YouTube:", url);
 
         const searchResponse = await fetch(url);
 
@@ -425,7 +425,7 @@ const MainApp = () => {
         const searchData = await searchResponse.json();
 
         if (!searchData.items?.length) {
-          console.log("❌ No se encontraron videos subidos en esta ubicación");
+          console.log("No se encontraron videos subidos en esta ubicación");
           return {
             videos: [],
             nextPageToken: "",
@@ -447,7 +447,7 @@ const MainApp = () => {
                 videoDetails?.recordingDetails?.location ||
                 videoDetails?.snippet?.locationDescription;
 
-              console.log("📍 Metadata de ubicación del video:", {
+              console.log("Metadata de ubicación del video:", {
                 videoId: item.id.videoId,
                 hasLocationData: hasLocationData,
                 recordingDetails: videoDetails?.recordingDetails,
@@ -491,7 +491,7 @@ const MainApp = () => {
 
         if (youtubeVideos.length === 0) {
           console.log(
-            "⚠️ No hay videos con metadata de ubicación, usando búsqueda normal"
+            "No hay videos con metadata de ubicación, usando búsqueda normal"
           );
 
           for (const item of searchData.items.slice(0, 12)) {
@@ -523,7 +523,7 @@ const MainApp = () => {
         }
 
         console.log(
-          "✅ Videos encontrados con ubicación:",
+          "Videos encontrados con ubicación:",
           youtubeVideos.length
         );
 
@@ -647,7 +647,7 @@ const MainApp = () => {
           setActiveFilter("search");
           setSearchLocation({ latitude, longitude, name: locationName });
 
-          console.log("✅ Videos cargados para ubicación:", {
+          console.log("Videos cargados para ubicación:", {
             location: locationName,
             videos: result.videos.length,
             withLocationData: result.videos.filter((v) => v.confirmedLocation)
@@ -661,7 +661,7 @@ const MainApp = () => {
             setActiveFilter("no-videos");
 
             console.log(
-              "❌ No se encontraron videos subidos en:",
+              "No se encontraron videos subidos en:",
               locationName
             );
 
@@ -982,7 +982,7 @@ const MainApp = () => {
   const autoSearchOnLocationChange = useCallback(async () => {
     if (!activeSearchTerm.trim()) return;
 
-    console.log("🔄 Búsqueda automática por cambio de ubicación:", {
+    console.log("Búsqueda automática por cambio de ubicación:", {
       termino: activeSearchTerm,
       ubicacion_clickeada: clickedLocation ? clickedLocationName : "none",
       ubicacion_actual: userLocation ? userLocationName : "none",
@@ -1023,7 +1023,7 @@ const MainApp = () => {
         activeSearchTerm
       );
 
-      console.log("✅ Búsqueda automática exitosa:", {
+      console.log("Búsqueda automática exitosa:", {
         termino: activeSearchTerm,
         ubicacion: locationName,
       });
@@ -1066,7 +1066,7 @@ const MainApp = () => {
         searchQuery
       );
 
-      console.log("✅ Búsqueda exitosa en ubicación clickeada:", {
+      console.log("Búsqueda exitosa en ubicación clickeada:", {
         query: searchQuery,
         location: clickedLocationName,
       });
@@ -1157,7 +1157,7 @@ const MainApp = () => {
           if (activeSearchTerm.trim()) {
             setTimeout(() => {
               console.log(
-                "🔄 Búsqueda automática en nueva ubicación clickeada:",
+                "Búsqueda automática en nueva ubicación clickeada:",
                 {
                   termino: activeSearchTerm,
                   ubicacion: locationCheck.placeName,
@@ -1433,7 +1433,7 @@ const MainApp = () => {
           longitude = clickedLocation.longitude;
           locationName = clickedLocationName;
 
-          console.log("🔍 Búsqueda con ubicación clickeada:", {
+          console.log("Búsqueda con ubicación clickeada:", {
             query: query,
             location: locationName,
             coordinates: { latitude, longitude },
@@ -1443,14 +1443,14 @@ const MainApp = () => {
           longitude = userLocation.longitude;
           locationName = userLocationName;
 
-          console.log("🔍 Búsqueda con ubicación actual:", {
+          console.log("Búsqueda con ubicación actual:", {
             query: query,
             location: locationName,
             coordinates: { latitude, longitude },
           });
         } else {
           console.log(
-            "⚠️  No hay ubicación activa, buscando ubicación para:",
+            "No hay ubicación activa, buscando ubicación para:",
             query
           );
 
@@ -1470,7 +1470,7 @@ const MainApp = () => {
               });
             }
 
-            console.log("📍 Nueva ubicación encontrada:", locationName);
+            console.log("Nueva ubicación encontrada:", locationName);
           } catch (error) {
             throw new Error(
               "Primero activa tu ubicación o selecciona una en el mapa. Error: " +
@@ -1502,7 +1502,7 @@ const MainApp = () => {
           isLoadMore
         );
       } catch (error) {
-        console.error("❌ Error en búsqueda:", error);
+        console.error("Error en búsqueda:", error);
         if (!isLoadMore) {
           setSearchError(
             error.message ||
@@ -1780,7 +1780,7 @@ const MainApp = () => {
 
           if (activeSearchTerm.trim()) {
             console.log(
-              "🔄 Búsqueda automática al regresar a ubicación actual:",
+              "Búsqueda automática al regresar a ubicación actual:",
               activeSearchTerm
             );
             await loadVideosForLocation(
@@ -1874,7 +1874,7 @@ const MainApp = () => {
     (e) => {
       e.preventDefault();
       if (searchTerm.trim()) {
-        console.log("🚀 Iniciando búsqueda manual:", {
+        console.log("Iniciando búsqueda manual:", {
           termino: searchTerm,
           ubicacion_clickeada: clickedLocation ? clickedLocationName : "none",
           ubicacion_actual: userLocation ? userLocationName : "none",
@@ -2163,6 +2163,16 @@ const MainApp = () => {
       : `${minutes}:${seconds.padStart(2, "0")}`;
   }, []);
 
+  // Función para alternar la visibilidad de los videos en móvil
+  const toggleVideosVisibility = useCallback(() => {
+    console.log("Toggle videos visibility - Estado actual:", showSidebar);
+    setShowSidebar(prev => {
+      const newState = !prev;
+      console.log("Nuevo estado:", newState);
+      return newState;
+    });
+  }, [showSidebar]);
+
   // Componente de Sugerencias
   const SearchSuggestions = useCallback(() => {
     if (!showSuggestions || !suggestions.length) return null;
@@ -2388,7 +2398,7 @@ const MainApp = () => {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+                      d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976-2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
                     />
                   </svg>
                   <span>Comentarios del Proyecto</span>
@@ -2575,7 +2585,7 @@ const MainApp = () => {
 
           {/* Barra de búsqueda */}
           {(!isMobile || showSearchBar) && (
-            <div className="relative">
+            <div className="search-container">
               <form onSubmit={handleSearchSubmit} className="flex items-center">
                 <div className="relative">
                   <input
@@ -2893,9 +2903,10 @@ const MainApp = () => {
         {/* Mapa */}
         <div
           className={`relative mobile-map-container ${
-            isMobile ? (showSidebar ? "map-container-with-videos h-[55vh]" : "h-full") : "flex-1"
+            isMobile ? "h-full" : "flex-1"
           }`}
         >
+
           <Map
             {...viewport}
             style={{ width: "100%", height: "100%" }}
@@ -3066,65 +3077,83 @@ const MainApp = () => {
             ))}
           </Map>
 
-          {/* Botones de control del mapa */}
-          <div
-            className={`absolute ${
-              isMobile
-                ? "bottom-4 right-4 left-4 flex justify-between"
-                : "bottom-6 right-6"
-            }`}
-          >
-            {/* Botón Mi Ubicación */}
-            <button
-              onClick={getUserLocation}
-              disabled={isAnimating}
-              className={`btn-success bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold rounded-2xl shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 ${
-                isMobile
-                  ? "px-4 py-3 text-sm flex items-center gap-2"
-                  : "px-6 py-3 text-lg"
-              }`}
-            >
-              {isAnimating ? (
-                <>
-                  <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
-                  {isMobile ? "Moviendo..." : "Moviendo..."}
-                </>
-              ) : (
-                <>
-                  <svg
-                    className={isMobile ? "w-4 h-4" : "w-5 h-5"}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                  </svg>
-                  {!isMobile && "Mi Ubicación"}
-                </>
-              )}
-            </button>
+          {/* 📱 Controles para móvil - POSICIONES CORREGIDAS */}
+          {isMobile && (
+            <div className="mobile-controls-container">
+              {/* Botón de ubicación - ARRIBA A LA DERECHA */}
+              <div className="mobile-top-controls">
+                <button
+                  className="location-btn-mobile"
+                  onClick={getUserLocation}
+                  title="Mi ubicación actual"
+                  disabled={isAnimating}
+                >
+                  {isAnimating ? (
+                    <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
 
-            {/* Botón para mostrar/ocultar videos en móvil */}
-            {isMobile && (
+              {/* Botón de mostrar videos - ABAJO CENTRADO */}
+              <div className="mobile-bottom-controls">
+                <button
+                  className="toggle-videos-btn-mobile"
+                  onClick={toggleVideosVisibility}
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  Mostrar Videos
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Botones de control del mapa para escritorio */}
+          {!isMobile && (
+            <div className="absolute bottom-6 right-6">
               <button
-                onClick={() => setShowSidebar(!showSidebar)}
-                className="toggle-videos-btn"
+                onClick={getUserLocation}
+                disabled={isAnimating}
+                className="btn-success bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold rounded-2xl shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 px-6 py-3 text-lg"
               >
-                {showSidebar ? "⬇️ Ocultar Videos" : "⬆️ Mostrar Videos"}
+                {isAnimating ? (
+                  <>
+                    <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
+                    Moviendo...
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      className="w-5 h-5 inline mr-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                    </svg>
+                    Mi Ubicación
+                  </>
+                )}
               </button>
-            )}
-          </div>
+            </div>
+          )}
 
           {isAnimating && (
             <div className="absolute top-4 right-4 glass-effect bg-gray-800/80 px-3 py-2 rounded-lg">
@@ -3163,29 +3192,20 @@ const MainApp = () => {
           )}
         </div>
 
-        {/* Sidebar para escritorio */}
-        {!isMobile && showSidebar && (
-          <div className="w-1/3 p-6 bg-gradient-to-b from-slate-900 via-purple-900 to-blue-900 overflow-y-auto flex flex-col">
-            {/* ... (código del sidebar de escritorio existente) ... */}
-            <div className="text-center mb-6">
-              <h2 className="text-3xl font-bold bg-gradient-to-r from-yellow-400 via-red-400 to-pink-400 bg-clip-text text-transparent">
-                {getSidebarTitle()}
-              </h2>
-              <p className="text-cyan-300 text-sm mt-2">
-                {getSidebarSubtitle()}
-              </p>
-            </div>
-
-            {/* Resto del sidebar de escritorio... */}
-            {/* ... (mantener el código existente del sidebar) ... */}
-          </div>
-        )}
-
-        {/* Barra de videos móvil - NUEVO DISEÑO */}
+        {/* Barra de videos móvil - SOLO PARA MÓVIL */}
         {isMobile && showSidebar && (
           <div className={`videos-container-mobile ${orientation} video-scrollbar`}>
-            {/* Header */}
-            <div className="videos-header">
+            {/* Header con botón de cerrar */}
+            <div className="videos-header relative">
+              <button
+                onClick={() => setShowSidebar(false)}
+                className="absolute right-3 top-3 w-8 h-8 flex items-center justify-center bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded-full transition-all duration-300 z-10"
+                title="Cerrar lista de videos"
+              >
+                <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
               <h3>{getSidebarTitle()}</h3>
               <p>{getSidebarSubtitle()}</p>
             </div>
@@ -3221,7 +3241,7 @@ const MainApp = () => {
               </div>
             </div>
 
-            {/* Lista de videos */}
+            {/* Lista de videos móvil */}
             <div className="flex-1 overflow-y-auto py-2">
               {videos.length > 0 ? (
                 videos.map((video) => (
@@ -3294,6 +3314,247 @@ const MainApp = () => {
                     )}
                   </button>
                 </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Sidebar para escritorio - COMPLETO Y FUNCIONAL */}
+        {!isMobile && showSidebar && (
+          <div className="w-1/3 p-6 bg-gradient-to-b from-slate-900 via-purple-900 to-blue-900 overflow-y-auto flex flex-col">
+            {/* Encabezado del sidebar */}
+            <div className="text-center mb-6">
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-yellow-400 via-red-400 to-pink-400 bg-clip-text text-transparent">
+                {getSidebarTitle()}
+              </h2>
+              <p className="text-cyan-300 text-sm mt-2">
+                {getSidebarSubtitle()}
+              </p>
+            </div>
+
+            {/* Botones de acción */}
+            <div className="grid gap-3 mb-6 grid-cols-2">
+              <button
+                onClick={fetchOtherVideos}
+                disabled={
+                  (!userLocation && !clickedLocation) || loadingVideos
+                }
+                className={`font-bold rounded-2xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg ${
+                  activeFilter === "other"
+                    ? "bg-cyan-600 border-2 border-cyan-400"
+                    : "bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600"
+                } py-3 px-4`}
+                title={
+                  clickedLocation && isValidLocation
+                    ? `Buscar videos cercanos a ${clickedLocationName}`
+                    : userLocation
+                    ? "Buscar videos cercanos a tu ubicación"
+                    : "Activa tu ubicación o selecciona una en el mapa"
+                }
+              >
+                {loadingVideos && activeFilter === "other"
+                  ? "Cargando..."
+                  : "Videos Cercanos"}
+              </button>
+              <button
+                onClick={fetchPopularVideos}
+                disabled={
+                  (!userLocation && !clickedLocation) || loadingVideos
+                }
+                className={`font-bold rounded-2xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg ${
+                  activeFilter === "popular"
+                    ? "bg-orange-600 border-2 border-orange-400"
+                    : "bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
+                } py-3 px-4`}
+                title={
+                  clickedLocation && isValidLocation
+                    ? `Buscar videos populares en ${clickedLocationName}`
+                    : userLocation
+                    ? "Buscar videos populares en tu ubicación"
+                    : "Activa tu ubicación o selecciona una en el mapa"
+                }
+              >
+                {loadingVideos && activeFilter === "popular"
+                  ? "Cargando..."
+                  : "Populares"}
+              </button>
+            </div>
+
+            {loadingVideos && (
+              <div className="glass-effect bg-gray-800/50 rounded-2xl text-center p-4 mb-6">
+                <p className="text-cyan-400 flex items-center justify-center gap-2 text-sm">
+                  <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-cyan-400"></span>
+                  {activeFilter === "search"
+                    ? "Buscando videos..."
+                    : "Cargando videos..."}
+                </p>
+              </div>
+            )}
+
+            {selectedVideo && (
+              <div className="glass-effect bg-gray-800/50 rounded-2xl border-2 border-cyan-500/50 p-4 mb-6">
+                <div className="text-center mb-3">
+                  <h3 className="font-bold text-cyan-300 text-lg">
+                    Vista Previa: {selectedVideo.channelTitle}
+                  </h3>
+                  <p className="text-gray-300 mt-1 line-clamp-2 text-sm">
+                    {selectedVideo.title}
+                  </p>
+                </div>
+                <div className="bg-black rounded-lg overflow-hidden mb-3">
+                  <YouTube
+                    videoId={selectedVideo.youtube_video_id}
+                    opts={{
+                      width: "100%",
+                      height: "200",
+                      playerVars: {
+                        autoplay: 0,
+                        modestbranding: 1,
+                        rel: 0,
+                      },
+                    }}
+                  />
+                </div>
+                <div className="grid gap-3 grid-cols-2">
+                  <button
+                    onClick={() => setSelectedVideo(null)}
+                    className="bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-3 rounded-lg transition-all duration-300 text-sm"
+                  >
+                    Cerrar
+                  </button>
+                  <button
+                    onClick={handleWatchComplete}
+                    className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-semibold py-2 px-3 rounded-lg transition-all duration-300 transform hover:scale-105 text-sm"
+                  >
+                    Ver Completo
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Lista de videos - COMPLETA PARA ESCRITORIO */}
+            <div className="space-y-4 flex-1 overflow-y-auto">
+              {videos.length > 0 ? (
+                <>
+                  {videos.map((video) => (
+                    <div
+                      key={video.youtube_video_id}
+                      onClick={() => handleVideoClick(video)}
+                      onDoubleClick={() => handleVideoDoubleClick(video)}
+                      className={`glass-effect bg-gray-800/50 rounded-2xl cursor-pointer transform hover:scale-102 transition-all duration-300 border-l-4 ${
+                        video.isSearchResult
+                          ? "border-l-yellow-500 bg-yellow-500/10"
+                          : video.isCurrentLocation
+                          ? "border-l-green-500 bg-green-500/10"
+                          : "border-l-cyan-500 bg-cyan-500/10"
+                      } ${
+                        selectedVideo?.youtube_video_id ===
+                        video.youtube_video_id
+                          ? "ring-2 ring-yellow-400"
+                          : ""
+                      } p-4`}
+                      title="Click para vista previa, Doble click para ver completo"
+                    >
+                      <div className="flex gap-3">
+                        <div className="flex-shrink-0">
+                          <img
+                            src={`https://img.youtube.com/vi/${video.youtube_video_id}/mqdefault.jpg`}
+                            alt="Miniatura del video"
+                            className="rounded-lg object-cover w-20 h-15"
+                            onError={(e) => {
+                              e.target.src =
+                                "https://via.placeholder.com/120x90/1f2937/6b7280?text=Video";
+                            }}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div
+                              className={`rounded-full ${
+                                video.isSearchResult
+                                  ? "bg-gradient-to-r from-yellow-500 to-orange-500"
+                                  : "bg-gradient-to-r from-green-500 to-emerald-500"
+                              } h-3 w-3`}
+                            ></div>
+                            <p className="font-bold text-white text-sm truncate">
+                              {video.channelTitle}
+                            </p>
+                          </div>
+                          <p className="text-gray-300 line-clamp-2 mb-1 text-xs">
+                            {video.title}
+                          </p>
+                          <div className="flex justify-between items-center">
+                            <span className="text-yellow-300 text-xs">
+                              {video.views.toLocaleString()} vistas
+                            </span>
+                            {video.duration &&
+                              video.duration !== "PT0S" && (
+                                <span className="text-cyan-400 text-xs">
+                                  {formatDuration(video.duration)}
+                                </span>
+                              )}
+                          </div>
+                          <p className="text-cyan-400 mt-1 text-xs truncate">
+                            {video.location_name}
+                          </p>
+                          {video.confirmedLocation && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <svg
+                                className="w-3 h-3 text-green-400"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M5 13l4 4L19 7"
+                                />
+                              </svg>
+                              <span className="text-green-400 text-xs">
+                                Ubicación confirmada
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {hasMoreVideos && (
+                    <div className="flex justify-center mt-4 mb-2">
+                      <button
+                        onClick={loadMoreVideos}
+                        disabled={isLoadingMore}
+                        className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-2 px-6 rounded-2xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg text-sm"
+                      >
+                        {isLoadingMore ? (
+                          <div className="flex items-center gap-2">
+                            <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></span>
+                            Cargando...
+                          </div>
+                        ) : (
+                          "Mostrar más videos"
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                !loadingVideos &&
+                activeFilter !== "no-videos" && (
+                  <div className="text-center py-6">
+                    <p className="text-gray-400 text-sm">
+                      No se encontraron videos
+                    </p>
+                    <p className="text-gray-500 text-xs mt-1">
+                      {userLocation || clickedLocation
+                        ? "Usa los botones para cargar videos"
+                        : "Activa tu ubicación o usa la búsqueda"}
+                    </p>
+                  </div>
+                )
               )}
             </div>
           </div>
