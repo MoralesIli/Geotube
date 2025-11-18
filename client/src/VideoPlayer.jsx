@@ -640,13 +640,8 @@ const VideoPlayer = () => {
               )}
             </div>
             
+            {/* ✅ CORRECCIÓN: Eliminada la sección de ubicación actual */}
             <div className="flex items-center gap-4 flex-shrink-0">
-              {userLocationName && (
-                <div className="text-right flex-shrink-0">
-                  <p className="text-sm text-cyan-400">Ubicacion actual</p>
-                  <p className="text-xs text-gray-300">{userLocationName}</p>
-                </div>
-              )}
               <button 
                 onClick={handleBackToMap}
                 className="bg-gradient-to-r from-gray-700 to-gray-600 px-6 py-2 rounded-lg hover:from-gray-600 hover:to-gray-500 transition-all duration-300 border border-gray-600 hover:border-gray-500 flex-shrink-0"
