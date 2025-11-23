@@ -21,6 +21,8 @@ const MainApp = () => {
     latitude: 23.6345,
     longitude: -102.5528,
     zoom: 2,
+    width: '100%',
+    height: '100%'
   });
   const [targetViewport, setTargetViewport] = useState(null);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -181,17 +183,36 @@ const MainApp = () => {
     []
   );
 
-  // Efecto para detectar tamaño de pantalla y orientación
+  // Función para resetear el viewport
+  const resetViewport = useCallback(() => {
+    setViewport({
+      latitude: 23.6345,
+      longitude: -102.5528,
+      zoom: 2,
+      width: '100%',
+      height: '100%'
+    });
+  }, []);
+
+  // Efecto para detectar tamaño de pantalla y orientación - CORREGIDO
   useEffect(() => {
     const checkMobileAndOrientation = () => {
       if (typeof window === "undefined") return;
       
-      const width = window.innerWidth || 1024;
+      const width = window.innerWidth;
+      const height = window.innerHeight;
       const isMobileDetected = width < 1024;
-      const isLandscape = width > window.innerHeight;
+      const isLandscape = width > height;
 
       setIsMobile(isMobileDetected);
       setOrientation(isLandscape ? 'landscape' : 'portrait');
+
+      // Actualizar viewport con dimensiones correctas
+      setViewport(prev => ({
+        ...prev,
+        width: '100%',
+        height: '100%'
+      }));
 
       // Actualizar clases del body para CSS
       document.body.classList.toggle('orientation-landscape', isLandscape);
@@ -209,6 +230,9 @@ const MainApp = () => {
       checkMobileAndOrientation();
       window.addEventListener("resize", checkMobileAndOrientation);
       window.addEventListener("orientationchange", checkMobileAndOrientation);
+      
+      // Ejecutar después de que el DOM esté completamente cargado
+      setTimeout(checkMobileAndOrientation, 100);
     }
 
     return () => {
@@ -217,6 +241,23 @@ const MainApp = () => {
         window.removeEventListener("orientationchange", checkMobileAndOrientation);
       }
     };
+  }, []);
+
+  // Efecto para manejar el renderizado inicial del mapa
+  useEffect(() => {
+    const handleLoad = () => {
+      // Forzar actualización del viewport después de la carga
+      setTimeout(() => {
+        setViewport(prev => ({
+          ...prev,
+          width: '100%',
+          height: '100%'
+        }));
+      }, 500);
+    };
+
+    window.addEventListener('load', handleLoad);
+    return () => window.removeEventListener('load', handleLoad);
   }, []);
 
   // Función para validar tipo de ubicación
@@ -1614,6 +1655,8 @@ const MainApp = () => {
         longitude:
           start.longitude + (end.longitude - start.longitude) * easedProgress,
         zoom: start.zoom + (end.zoom - start.zoom) * easedProgress,
+        width: '100%',
+        height: '100%'
       };
 
       setViewport(newViewport);
@@ -1621,7 +1664,7 @@ const MainApp = () => {
       if (progress < 1) {
         animationRef.current = requestAnimationFrame(animateMap);
       } else {
-        setViewport({ ...end });
+        setViewport({ ...end, width: '100%', height: '100%' });
         setIsAnimating(false);
         setTargetViewport(null);
       }
@@ -2909,11 +2952,16 @@ const MainApp = () => {
 
           <Map
             {...viewport}
-            style={{ width: "100%", height: "100%" }}
+            style={{ 
+              width: viewport.width, 
+              height: viewport.height,
+              position: 'absolute'
+            }}
             onMove={(evt) => !isAnimating && setViewport(evt.viewState)}
             onClick={handleMapClick}
             mapboxAccessToken={MAPBOX_TOKEN}
             mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
+            reuseMaps={false}
           >
             {/* Ocultar controles en móvil */}
             {!isMobile && <NavigationControl position="top-right" />}
