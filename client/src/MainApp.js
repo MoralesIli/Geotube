@@ -193,6 +193,7 @@ const MainApp = () => {
       height: '100%'
     });
   }, []);
+  
 
   // Efecto para detectar tamaño de pantalla y orientación - CORREGIDO
   useEffect(() => {

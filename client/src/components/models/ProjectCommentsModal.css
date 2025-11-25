@@ -1,0 +1,430 @@
+/* ProjectCommentsModal.css - Mobile First Approach */
+
+/* Estilos base para móviles */
+.modal-overlay {
+  padding: 1rem;
+  align-items: flex-start;
+  padding-top: 2rem;
+}
+
+.modal-content {
+  max-height: 95vh;
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
+/* Header del modal */
+.modal-content .relative.p-6 {
+  padding: 1rem;
+}
+
+.modal-content .text-2xl {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}
+
+.modal-content .text-sm {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+/* Resumen de calificaciones */
+.modal-content .flex.items-center.gap-4 {
+  flex-direction: column;
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.modal-content .text-3xl {
+  font-size: 1.5rem;
+  line-height: 2rem;
+}
+
+/* Formulario de comentario */
+.modal-content .p-6 {
+  padding: 1rem;
+}
+
+.modal-content .space-y-4 > * + * {
+  margin-top: 0.75rem;
+}
+
+/* Sistema de estrellas para móvil */
+.modal-content .flex.gap-1.justify-center {
+  gap: 0.25rem;
+}
+
+.modal-content .text-3xl {
+  font-size: 2rem;
+}
+
+/* Textarea */
+.modal-content textarea {
+  font-size: 14px; /* Previene zoom en iOS */
+  min-height: 80px;
+}
+
+/* Botón de enviar */
+.modal-content button[type="submit"] {
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+}
+
+/* Lista de comentarios */
+.modal-content .flex-1.overflow-y-auto.p-6 {
+  padding: 1rem;
+  max-height: 40vh;
+}
+
+.modal-content .space-y-4 > * + * {
+  margin-top: 0.75rem;
+}
+
+/* Tarjeta de comentario individual */
+.modal-content .bg-gray-800\/30 {
+  padding: 0.75rem;
+}
+
+.modal-content .flex.items-center.gap-3.mb-3 {
+  gap: 0.5rem;
+}
+
+.modal-content .w-8.h-8 {
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 0.75rem;
+}
+
+/* Estrellas en comentarios */
+.modal-content .flex.items-center.gap-1 .flex {
+  gap: 0.1rem;
+}
+
+.modal-content .w-3.h-3 {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+/* Estados de carga y vacío */
+.modal-content .text-center.py-8 {
+  padding: 1.5rem 0;
+}
+
+.modal-content .w-16.h-16 {
+  width: 3rem;
+  height: 3rem;
+}
+
+.modal-content .w-8.h-8 {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+/* Scroll personalizado para móvil */
+.modal-content .overflow-y-auto {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 211, 238, 0.3) transparent;
+}
+
+.modal-content .overflow-y-auto::-webkit-scrollbar {
+  width: 4px;
+}
+
+.modal-content .overflow-y-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal-content .overflow-y-auto::-webkit-scrollbar-thumb {
+  background: rgba(34, 211, 238, 0.3);
+  border-radius: 2px;
+}
+
+/* MEDIA QUERY: TABLETS (768px en adelante) */
+@media (min-width: 768px) {
+  .modal-overlay {
+    align-items: center;
+    padding: 2rem;
+    padding-top: 1rem;
+  }
+
+  .modal-content {
+    margin-top: 0;
+    width: 92%;
+    max-width: 44rem;
+    max-height: 88vh;
+  }
+
+  /* Mejor alineación del header */
+  .modal-content .relative.p-6 {
+    padding: 1.75rem;
+  }
+
+  /* Mejor lectura */
+  .modal-content .text-2xl {
+    font-size: 1.6rem;
+  }
+
+  .modal-content .text-3xl {
+    font-size: 2.2rem;
+  }
+
+  /* Columna de calificación */
+  .modal-content .flex.items-center.gap-4 {
+    flex-direction: row;
+    gap: 1.25rem;
+    text-align: left;
+  }
+
+  /* Más espacio para comentarios */
+  .modal-content .flex-1.overflow-y-auto.p-6 {
+    padding: 1.5rem;
+    max-height: 48vh;
+  }
+}
+
+/* MEDIA QUERY: DESKTOP (1024px en adelante) */
+@media (min-width: 1024px) {
+  .modal-overlay {
+    padding: 3rem;
+  }
+
+  .modal-content {
+    width: 80%;
+    max-width: 52rem;
+    max-height: 88vh;
+  }
+
+  /* Mejor separación */
+  .modal-content .relative.p-6 {
+    padding: 2rem;
+  }
+  .modal-content .p-6 {
+    padding: 2rem;
+  }
+
+  .modal-content textarea {
+    font-size: 16px;
+    min-height: 120px;
+  }
+
+  /* Botón más grande y más elegante */
+  .modal-content button[type="submit"] {
+    padding: 1rem 1.75rem;
+    font-size: 1rem;
+  }
+
+  /* Comentarios */
+  .modal-content .flex-1.overflow-y-auto.p-6 {
+    max-height: 55vh;
+    padding: 2rem;
+  }
+
+  .modal-content .bg-gray-800\/30 {
+    padding: 1.25rem;
+    border-radius: 1.25rem;
+  }
+
+  /* Iconos más grandes */
+  .modal-content .w-8.h-8 {
+    width: 2.4rem;
+    height: 2.4rem;
+    font-size: 1rem;
+  }
+
+  /* Estrellas más separadas */
+  .modal-content .flex.gap-1.justify-center {
+    gap: 0.55rem;
+  }
+}
+
+/* MEDIA QUERY: PANTALLAS GRANDES (1440px+) */
+@media (min-width: 1440px) {
+  .modal-content {
+    max-width: 60rem; /* más ancho */
+    width: 78%;
+  }
+
+  .modal-content .flex-1.overflow-y-auto.p-6 {
+    max-height: 60vh;
+  }
+}
+
+/* MEDIA QUERY: PANTALLAS ULTRA GRANDES (1700px+) */
+@media (min-width: 1700px) {
+  .modal-content {
+    max-width: 70rem;
+    width: 70%;
+    max-height: 82vh;
+  }
+
+  .modal-content textarea {
+    min-height: 150px;
+  }
+
+  /* Comentarios con más aire */
+  .modal-content .flex-1.overflow-y-auto.p-6 {
+    max-height: 65vh;
+    padding: 2.5rem;
+  }
+}
+
+/* Mejoras específicas para iOS */
+@supports (-webkit-touch-callout: none) {
+  .modal-content {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .modal-content textarea {
+    font-size: 16px; /* Previene zoom en iOS */
+  }
+}
+
+/* Mejoras para dispositivos muy pequeños */
+@media (max-width: 320px) {
+  .modal-overlay {
+    padding: 0.5rem;
+  }
+  
+  .modal-content .p-6 {
+    padding: 0.75rem;
+  }
+  
+  .modal-content .text-2xl {
+    font-size: 1.125rem;
+  }
+}
+
+/* Ajustes para landscape en móviles */
+@media (max-height: 600px) and (orientation: landscape) {
+  .modal-overlay {
+    align-items: flex-start;
+    padding-top: 0.5rem;
+  }
+  
+  .modal-content {
+    max-height: 98vh;
+  }
+  
+  .modal-content .flex-1.overflow-y-auto.p-6 {
+    max-height: 30vh;
+  }
+  
+  .modal-content .p-6.border-b {
+    padding: 0.5rem;
+  }
+  
+  .modal-content textarea {
+    rows: "2";
+    min-height: 60px;
+  }
+}
+
+/* Prevención de desbordamiento en textos largos */
+.modal-content .text-cyan-300,
+.modal-content .font-semibold {
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Mejora de accesibilidad para botones */
+.modal-content button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Ajustes de contraste para mejor legibilidad */
+.modal-content .text-gray-400 {
+  color: rgba(156, 163, 175, 0.9);
+}
+
+.modal-content .text-gray-200 {
+  color: rgba(229, 231, 235, 0.95);
+}
+
+/* ======== DESKTOP (>=1024px) — Ajuste profesional ======== */
+@media (min-width: 1024px) {
+  .modal-overlay {
+    padding: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-content {
+    width: 75%;
+    max-width: 52rem;     /* Ancho ideal visualmente */
+    max-height: 82vh;     /* Mejor altura sin exagerar */
+    padding: 2rem 2.5rem;
+    border-radius: 1.5rem;
+  }
+
+  /* Header */
+  .modal-content .relative.p-6 {
+    padding: 0 0 1.5rem 0;
+  }
+
+  .modal-content .text-2xl {
+    font-size: 1.9rem;
+    line-height: 2.4rem;
+  }
+
+  /* Tabs */
+  .modal-content .flex.gap-1.justify-center {
+    margin-top: 1.5rem;
+    gap: 0.75rem;
+  }
+
+  /* Contenedor principal */
+  .modal-content .p-6 {
+    padding: 1.5rem 0;
+  }
+
+  /* Lista y opciones */
+  .modal-content .flex-1.overflow-y-auto.p-6 {
+    padding: 1.5rem 0;
+    max-height: 50vh;
+  }
+
+  /* Tarjetas */
+  .modal-content .bg-gray-800\/30 {
+    padding: 1.25rem;
+    border-radius: 1rem;
+  }
+
+  /* Iconos */
+  .modal-content .w-8.h-8 {
+    width: 2.2rem;
+    height: 2.2rem;
+    font-size: 1rem;
+  }
+}
+
+/* ======== PANTALLAS GRANDES (>=1440px) ======== */
+@media (min-width: 1440px) {
+  .modal-content {
+    width: 70%;
+    max-width: 64rem;   /* mucho mejor para monitores amplios */
+    max-height: 85vh;
+  }
+
+  .modal-content .flex-1.overflow-y-auto.p-6 {
+    max-height: 60vh;
+  }
+}
+
+/* ======== EXTRA-LARGE (>=1700px) — Opcional pero recomendado ======== */
+@media (min-width: 1700px) {
+  .modal-content {
+    width: 60%;
+    max-width: 72rem;
+  }
+
+  .modal-content textarea {
+    min-height: 150px;
+  }
+
+  .modal-content .flex-1.overflow-y-auto.p-6 {
+    max-height: 65vh;
+  }
+}
+

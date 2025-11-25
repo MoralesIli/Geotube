@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import './ProjectCommentsModal.css';
 
 const ProjectCommentsModal = ({ isOpen, onClose, user }) => {
   const [comments, setComments] = useState([]);
